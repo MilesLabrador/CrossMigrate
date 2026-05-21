@@ -1,0 +1,63 @@
+@import '@xyflow/react/dist/style.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: #0f1117;
+}
+
+.react-flow__background {
+  background-color: #0f1117 !important;
+}
+
+.react-flow__edge-path {
+  stroke: #5b6280;
+  stroke-width: 1.5;
+}
+.react-flow__edge.running .react-flow__edge-path {
+  stroke: #38bdf8;
+  stroke-dasharray: 6 4;
+  animation: dashFlow 0.6s linear infinite;
+}
+@keyframes dashFlow {
+  to { stroke-dashoffset: -10; }
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #0f1117;
+}
+.handle-source { background: #22c55e; }
+.handle-transform { background: #94a3b8; }
+.handle-destination { background: #f43f5e; }
+
+.react-flow__minimap {
+  background: #1a1d2b !important;
+  border-radius: 8px;
+  border: 1px solid #2a304a;
+}
+.react-flow__controls {
+  background: #1a1d2b !important;
+  border-radius: 8px;
+  border: 1px solid #2a304a;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: #1a1d2b !important;
+  color: #cbd5e1 !important;
+  border-bottom: 1px solid #2a304a !important;
+}
+.react-flow__controls-button:hover {
+  background: #252a3d !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0f1117; }
+::-webkit-scrollbar-thumb { background: #2a304a; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4060; }
