@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Papa from 'papaparse';
-import { Database, Download, Upload } from 'lucide-react';
+import { Download, Upload, ChevronDown, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { distance } from 'fastest-levenshtein';
 import { fetchEntities, fetchEntityFields, importToDataverseSSE } from '../../lib/api';
 import { usePipelineStore, getUpstreamColumns } from '../../store/usePipelineStore';
@@ -31,19 +31,20 @@ export default function DataverseOutputConfig({ nodeId }) {
   const [loadingEntities, setLoadingEntities] = useState(false);
   const [loadingFields, setLoadingFields] = useState(false);
   const [failedRows, setFailedRows] = useState(null);
+  const [errorsOpen, setErrorsOpen] = useState(true);  // auto-expand on failure
 
   useEffect(() => {
     setLoadingEntities(true);
-    fetchEntities()
+    fetchEntities(cfg.orgUrl || '')
       .then(setEntities)
       .catch((e) => console.error(e))
       .finally(() => setLoadingEntities(false));
-  }, []);
+  }, [cfg.orgUrl]);
 
   useEffect(() => {
     if (!cfg.entity) return;
     setLoadingFields(true);
-    fetchEntityFields(entityLogicalFromCollection(cfg.entity, entities))
+    fetchEntityFields(entityLogicalFromCollection(cfg.entity, entities), cfg.orgUrl || '')
       .then((f) => {
         setFields(f);
         if (!cfg.fieldMappings?.length || cfg.fieldMappings.length !== incoming.length) {
@@ -97,7 +98,7 @@ export default function DataverseOutputConfig({ nodeId }) {
     });
     setFailedRows(null);
     try {
-      await importToDataverseSSE({ entity: cfg.entity, rows: mapped }, (evt) => {
+      await importToDataverseSSE({ entity: cfg.entity, rows: mapped, orgUrl: cfg.orgUrl || '' }, (evt) => {
         if (evt.type === 'progress' || evt.type === 'start') {
           state.updateNodeData(nodeId, {
             _importProgress: {
@@ -119,7 +120,9 @@ export default function DataverseOutputConfig({ nodeId }) {
               total: evt.total ?? mapped.length,
             },
           });
-          setFailedRows(evt.failedRows || []);
+          const fr = evt.failedRows || [];
+          setFailedRows(fr);
+          if (fr.length) setErrorsOpen(true);
         }
         if (evt.type === 'error') {
           state.updateNodeData(nodeId, {
@@ -149,6 +152,15 @@ export default function DataverseOutputConfig({ nodeId }) {
 
   return (
     <div className="space-y-4">
+      <div>
+        <Label>Environment URL <span className="text-slate-600 normal-case font-normal text-[10px]">(blank = default from .env)</span></Label>
+        <input
+          value={cfg.orgUrl || ''}
+          onChange={(e) => state.updateNodeConfig(nodeId, { orgUrl: e.target.value, entity: '', fieldMappings: [] })}
+          placeholder="e.g. otherorg.crm.dynamics.com"
+          className="w-full bg-cardalt border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 font-mono outline-none focus:border-sky-500"
+        />
+      </div>
       <div>
         <Label>Entity (collection name)</Label>
         <select
@@ -205,13 +217,60 @@ export default function DataverseOutputConfig({ nodeId }) {
         <div className="text-[11px] text-slate-500">Run the pipeline first to stage rows for import.</div>
       )}
 
-      {failedRows?.length > 0 && (
-        <button
-          onClick={downloadFailed}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm"
-        >
-          <Download size={14} /> Download failed_rows.csv ({failedRows.length})
-        </button>
+      {/* ── Inline error log ───────────────────────────────────────────────── */}
+      {failedRows !== null && (
+        <div className="border border-slate-700 rounded-lg overflow-hidden">
+          {/* Header */}
+          <button
+            onClick={() => setErrorsOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-3 py-2 bg-slate-800 hover:bg-slate-700 transition text-left"
+          >
+            <div className="flex items-center gap-2">
+              {failedRows.length === 0
+                ? <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                : <AlertCircle  size={13} className="text-rose-400 shrink-0" />}
+              <span className="text-xs font-medium text-slate-200">
+                {failedRows.length === 0
+                  ? 'All rows imported successfully'
+                  : `${failedRows.length} row${failedRows.length > 1 ? 's' : ''} failed`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {failedRows.length > 0 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); downloadFailed(); }}
+                  className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-200 transition"
+                >
+                  <Download size={11} /> CSV
+                </button>
+              )}
+              {errorsOpen
+                ? <ChevronDown  size={13} className="text-slate-400" />
+                : <ChevronRight size={13} className="text-slate-400" />}
+            </div>
+          </button>
+
+          {/* Error list */}
+          {errorsOpen && failedRows.length > 0 && (
+            <div
+              className="max-h-72 overflow-y-auto divide-y divide-slate-800"
+              onWheelCapture={(e) => e.stopPropagation()}
+            >
+              {failedRows.map((row, i) => {
+                const label = rowLabel(row);
+                const err   = row._error || 'Unknown error';
+                return (
+                  <div key={i} className="px-3 py-2 space-y-0.5">
+                    {label && (
+                      <div className="text-[11px] font-medium text-slate-300 truncate">{label}</div>
+                    )}
+                    <div className="text-[10px] text-rose-300 leading-relaxed break-words">{err}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -220,6 +279,23 @@ export default function DataverseOutputConfig({ nodeId }) {
 function entityLogicalFromCollection(collName, entities) {
   const e = entities.find((x) => x.logicalCollectionName === collName);
   return e?.logicalName || collName;
+}
+
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Pick the most human-readable identifier from a failed row for display
+function rowLabel(row) {
+  // Prefer fields whose name suggests a human label
+  const namePriority = ['lm_name', 'name', 'title', 'subject', 'fullname', 'cr7c7_name'];
+  for (const k of namePriority) {
+    if (row[k] && typeof row[k] === 'string' && !GUID_RE.test(row[k])) return row[k];
+  }
+  // Fall back to the first non-GUID string value that looks like a label
+  for (const [k, v] of Object.entries(row)) {
+    if (k.startsWith('_')) continue;
+    if (typeof v === 'string' && v.length > 2 && v.length < 120 && !GUID_RE.test(v)) return v;
+  }
+  return null;
 }
 
 function Label({ children }) {

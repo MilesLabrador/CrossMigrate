@@ -17,6 +17,7 @@ export default function NodeShell({
   typeLabel,
   children,
   selected,
+  widthClass = 'w-64',  // override for wider nodes (e.g. expanded Preview)
 }) {
   const { nodes, updateNodeData, nodeStatus, selectNode } = usePipelineStore();
   const node = nodes.find((n) => n.id === id);
@@ -51,7 +52,8 @@ export default function NodeShell({
         selectNode(id);
       }}
       className={clsx(
-        'animate-scale-in w-64 rounded-xl bg-card shadow-node text-slate-100 overflow-hidden border',
+        'animate-scale-in rounded-xl bg-card shadow-node text-slate-100 overflow-hidden border',
+        widthClass,
         selected ? 'border-sky-400/80 ring-2 ring-sky-400/30' : `${colors.border}`
       )}
     >

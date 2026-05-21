@@ -9,8 +9,9 @@ export function executeNode(node, inputRows) {
   const cfg = node.data?.config || {};
   switch (type) {
     case 'csvInput':
-    case 'manualData': {
-      // Source nodes already carry their rows in node.data.rows
+    case 'manualData':
+    case 'dataverseInput': {
+      // Source nodes carry their rows in node.data.rows (fetched before pipeline run)
       const rows = node.data?.rows || [];
       return { rows, meta: { rowCount: rows.length } };
     }
@@ -36,9 +37,20 @@ export function executeNode(node, inputRows) {
         meta: { rowCount: out.length, duplicatesRemoved: duplicateCount(inputRows, cfg) },
       };
     }
+    case 'randomSample': {
+      const size = Math.max(1, parseInt(cfg.size) || 100);
+      if (inputRows.length <= size) {
+        return { rows: inputRows, meta: { rowCount: inputRows.length, note: 'Input smaller than sample size — returned all rows' } };
+      }
+      const out = fisherYates(inputRows, size);
+      return { rows: out, meta: { rowCount: out.length, sampledFrom: inputRows.length } };
+    }
     case 'preview': {
-      // Pass-through; UI handles displaying
       return { rows: inputRows, meta: { rowCount: inputRows.length } };
+    }
+    case 'previewColumns': {
+      const schema = inferSchema(inputRows);
+      return { rows: inputRows, meta: { rowCount: inputRows.length, schema } };
     }
     case 'csvExport': {
       // Pass through; client handles download
@@ -51,4 +63,47 @@ export function executeNode(node, inputRows) {
     default:
       return { rows: inputRows, meta: { rowCount: inputRows.length, warning: `unknown node type ${type}` } };
   }
+}
+
+// ─── Random sample (Fisher-Yates) ────────────────────────────────────────────
+function fisherYates(arr, n) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
+}
+
+// ─── Schema inference ────────────────────────────────────────────────────────
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]+)?$/;
+const BOOL_SET = new Set(['true', 'false', '1', '0', 'yes', 'no']);
+
+function inferType(values) {
+  const nonNull = values.filter((v) => v !== null && v !== undefined && v !== '');
+  if (!nonNull.length) return 'empty';
+
+  let isNum = true, isBool = true, isDate = true;
+  for (const v of nonNull) {
+    const s = String(v).trim().toLowerCase();
+    if (isNum  && isNaN(Number(v)))            isNum  = false;
+    if (isBool && !BOOL_SET.has(s))            isBool = false;
+    if (isDate && !ISO_DATE.test(String(v)))   isDate = false;
+    if (!isNum && !isBool && !isDate) break;
+  }
+  if (isBool) return 'boolean';
+  if (isDate) return 'date';
+  if (isNum)  return 'number';
+  return 'text';
+}
+
+function inferSchema(rows) {
+  if (!rows.length) return [];
+  const sample = rows.slice(0, 100); // look at up to 100 rows per column
+  const cols = Object.keys(rows[0]);
+  return cols.map((col) => ({
+    name: col,
+    type: inferType(sample.map((r) => r[col])),
+    nullCount: rows.filter((r) => r[col] === null || r[col] === undefined || r[col] === '').length,
+  }));
 }

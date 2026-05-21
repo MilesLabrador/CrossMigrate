@@ -5,9 +5,12 @@ import {
   Filter as FilterIcon,
   Wand2,
   CopyMinus,
+  Shuffle,
   Database,
+  DatabaseZap,
   Download,
   Eye,
+  TableProperties,
 } from 'lucide-react';
 
 export const PALETTE = [
@@ -15,8 +18,9 @@ export const PALETTE = [
     group: 'Sources',
     accent: 'text-emerald-400',
     items: [
-      { type: 'csvInput',   label: 'CSV Input',   icon: FileSpreadsheet, desc: 'Upload a CSV file' },
-      { type: 'manualData', label: 'Manual Data',  icon: Pencil,          desc: 'Type rows by hand' },
+      { type: 'dataverseInput', label: 'Dataverse Input', icon: DatabaseZap,     desc: 'Fetch rows from Dataverse' },
+      { type: 'csvInput',       label: 'CSV Input',        icon: FileSpreadsheet, desc: 'Upload a CSV file' },
+      { type: 'manualData',     label: 'Manual Data',      icon: Pencil,          desc: 'Type rows by hand' },
     ],
   },
   {
@@ -26,7 +30,10 @@ export const PALETTE = [
       { type: 'selectMap',   label: 'Select / Map', icon: ArrowLeftRight, desc: 'Map source → target fields' },
       { type: 'filter',      label: 'Filter',        icon: FilterIcon,     desc: 'Keep rows matching conditions' },
       { type: 'transform',   label: 'Transform',     icon: Wand2,          desc: 'Clean & reformat fields' },
-      { type: 'deduplicate', label: 'Deduplicate',   icon: CopyMinus,      desc: 'Remove duplicate rows' },
+      { type: 'deduplicate',   label: 'Deduplicate',     icon: CopyMinus, desc: 'Remove duplicate rows' },
+      { type: 'randomSample', label: 'Random Sample',   icon: Shuffle,   desc: 'Grab N random rows' },
+      { type: 'preview',        label: 'Preview',         icon: Eye,             desc: 'Inspect rows — passes through' },
+      { type: 'previewColumns', label: 'Preview Columns', icon: TableProperties, desc: 'Show column names & types' },
     ],
   },
   {
@@ -35,7 +42,6 @@ export const PALETTE = [
     items: [
       { type: 'dataverseOutput', label: 'Dataverse Output', icon: Database, desc: 'Import into Dataverse' },
       { type: 'csvExport',       label: 'CSV Export',       icon: Download, desc: 'Download as CSV' },
-      { type: 'preview',         label: 'Preview',          icon: Eye,      desc: 'Inspect mid-pipeline rows' },
     ],
   },
 ];

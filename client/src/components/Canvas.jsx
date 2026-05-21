@@ -10,6 +10,9 @@ import {
 } from '@xyflow/react';
 import { usePipelineStore } from '../store/usePipelineStore';
 
+import DataverseInputNode   from '../nodes/DataverseInputNode';
+import PreviewColumnsNode  from '../nodes/PreviewColumnsNode';
+import RandomSampleNode   from '../nodes/RandomSampleNode';
 import CSVInputNode        from '../nodes/CSVInputNode';
 import ManualDataNode      from '../nodes/ManualDataNode';
 import SelectMapNode       from '../nodes/SelectMapNode';
@@ -21,6 +24,9 @@ import CSVExportNode       from '../nodes/CSVExportNode';
 import DataverseOutputNode from '../nodes/DataverseOutputNode';
 
 const nodeTypes = {
+  dataverseInput:  DataverseInputNode,
+  previewColumns:  PreviewColumnsNode,
+  randomSample:    RandomSampleNode,
   csvInput:        CSVInputNode,
   manualData:      ManualDataNode,
   selectMap:       SelectMapNode,
@@ -127,6 +133,12 @@ function CanvasInner() {
         maxZoom={4}
         snapToGrid
         snapGrid={[20, 20]}
+        // Two-finger trackpad → pan freely; pinch → zoom; scroll wheel alone → pan
+        panOnScroll
+        panOnScrollMode="free"
+        panOnScrollSpeed={0.6}
+        zoomOnScroll={false}
+        zoomOnPinch
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode={['Shift']}
         proOptions={{ hideAttribution: true }}
@@ -136,8 +148,8 @@ function CanvasInner() {
         <MiniMap
           position="bottom-right"
           nodeColor={(n) => {
-            if (n.type === 'csvInput' || n.type === 'manualData') return '#22c55e';
-            if (['dataverseOutput', 'csvExport', 'preview'].includes(n.type)) return '#f43f5e';
+            if (['csvInput', 'manualData', 'dataverseInput'].includes(n.type)) return '#22c55e';
+            if (['dataverseOutput', 'csvExport'].includes(n.type)) return '#f43f5e';
             return '#64748b';
           }}
           maskColor="rgba(15,17,23,0.6)"

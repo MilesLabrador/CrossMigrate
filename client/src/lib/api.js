@@ -1,12 +1,18 @@
 // Thin API wrappers — Vite proxies /api -> :3001
-export async function fetchEntities() {
-  const r = await fetch('/api/entities');
-  if (!r.ok) throw new Error(`entities: ${r.status}`);
+export async function fetchEntities(orgUrl = '') {
+  const qs = orgUrl ? `?orgUrl=${encodeURIComponent(orgUrl)}` : '';
+  const r = await fetch(`/api/entities${qs}`);
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    const detail = body?.error?.message || body?.error || body?.message || `HTTP ${r.status}`;
+    throw new Error(String(detail));
+  }
   return r.json();
 }
 
-export async function fetchEntityFields(logicalName) {
-  const r = await fetch(`/api/entities/${encodeURIComponent(logicalName)}/fields`);
+export async function fetchEntityFields(logicalName, orgUrl = '') {
+  const qs = orgUrl ? `?orgUrl=${encodeURIComponent(orgUrl)}` : '';
+  const r = await fetch(`/api/entities/${encodeURIComponent(logicalName)}/fields${qs}`);
   if (!r.ok) throw new Error(`fields: ${r.status}`);
   return r.json();
 }
@@ -59,12 +65,26 @@ export async function runPipelineStream({ nodes, edges }, onEvent) {
   }
 }
 
+// Fetch rows from a Dataverse table
+export async function fetchDataverseRows({ entity, select = '', filter = '', top = 5000, orgUrl = '' }) {
+  const r = await fetch('/api/fetch-dataverse', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entity, select, filter, top, orgUrl }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `fetch-dataverse: ${r.status}`);
+  }
+  return r.json(); // { rows, columns, rowCount }
+}
+
 // SSE for Dataverse import
-export async function importToDataverseSSE({ entity, rows }, onEvent) {
+export async function importToDataverseSSE({ entity, rows, orgUrl = '' }, onEvent) {
   const r = await fetch('/api/import-dataverse', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ entity, rows }),
+    body: JSON.stringify({ entity, rows, orgUrl }),
   });
   if (!r.ok || !r.body) throw new Error(`import-dataverse: ${r.status}`);
   const reader = r.body.getReader();

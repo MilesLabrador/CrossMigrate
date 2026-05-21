@@ -22,6 +22,28 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [save]);
 
+  // Block horizontal scroll events that trigger browser back/forward navigation,
+  // but allow them when the cursor is over a horizontally scrollable container.
+  useEffect(() => {
+    const preventHorizontalSwipe = (e) => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return; // vertical-dominant, ignore
+
+      // Walk up the DOM — if any ancestor can actually scroll horizontally, let it through
+      let el = e.target;
+      while (el && el !== document.body) {
+        const { overflowX } = window.getComputedStyle(el);
+        if ((overflowX === 'auto' || overflowX === 'scroll') && el.scrollWidth > el.clientWidth) {
+          return;
+        }
+        el = el.parentElement;
+      }
+
+      e.preventDefault();
+    };
+    window.addEventListener('wheel', preventHorizontalSwipe, { passive: false });
+    return () => window.removeEventListener('wheel', preventHorizontalSwipe);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col">
       <Toolbar />

@@ -2,24 +2,29 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { usePipelineStore } from '../store/usePipelineStore';
 import CSVInputConfig from './configs/CSVInputConfig';
+import DataverseInputConfig from './configs/DataverseInputConfig';
 import SelectMapConfig from './configs/SelectMapConfig';
 import FilterConfig from './configs/FilterConfig';
 import TransformConfig from './configs/TransformConfig';
 import DeduplicateConfig from './configs/DeduplicateConfig';
+import RandomSampleConfig from './configs/RandomSampleConfig';
 import CSVExportConfig from './configs/CSVExportConfig';
 import DataverseOutputConfig from './configs/DataverseOutputConfig';
 import PreviewConfig from './configs/PreviewConfig';
 
 const REGISTRY = {
+  dataverseInput: { title: 'Dataverse Input', Comp: DataverseInputConfig },
   csvInput: { title: 'CSV Input', Comp: CSVInputConfig },
   manualData: { title: 'Manual Data', Comp: () => <div className="text-xs text-slate-400">Edit cells directly on the node.</div> },
   selectMap: { title: 'Select / Map', Comp: SelectMapConfig },
   filter: { title: 'Filter', Comp: FilterConfig },
   transform: { title: 'Transform', Comp: TransformConfig },
-  deduplicate: { title: 'Deduplicate', Comp: DeduplicateConfig },
+  deduplicate:  { title: 'Deduplicate',   Comp: DeduplicateConfig },
+  randomSample: { title: 'Random Sample', Comp: RandomSampleConfig },
   csvExport: { title: 'CSV Export', Comp: CSVExportConfig },
   dataverseOutput: { title: 'Dataverse Output', Comp: DataverseOutputConfig },
   preview: { title: 'Preview', Comp: PreviewConfig },
+  previewColumns: { title: 'Preview Columns', Comp: () => <div className="text-xs text-slate-400">Schema is inferred automatically when the pipeline runs. No configuration needed.</div> },
 };
 
 export default function ConfigPanel() {

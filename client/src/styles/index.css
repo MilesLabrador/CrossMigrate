@@ -8,6 +8,8 @@ html, body, #root {
   height: 100%;
   margin: 0;
   background: #0f1117;
+  /* Prevent browser back/forward swipe gestures */
+  overscroll-behavior-x: none;
 }
 
 .react-flow__background {

@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid';
 const STORAGE_KEY = 'crossmigrate:pipeline';
 
 export const NODE_DEFAULTS = {
+  dataverseInput: { config: { orgUrl: '', entity: '', select: '', filter: '', top: 5000 }, rows: [], columns: [] },
   csvInput: { config: {}, rows: [], columns: [] },
   manualData: {
     config: {},
@@ -14,10 +15,12 @@ export const NODE_DEFAULTS = {
   selectMap: { config: { mappings: [] } },
   filter: { config: { combinator: 'AND', conditions: [] } },
   transform: { config: { fieldTransforms: [] } },
-  deduplicate: { config: { fields: [], strategy: 'first' } },
+  deduplicate:  { config: { fields: [], strategy: 'first' } },
+  randomSample: { config: { size: 100 } },
   preview: { config: {} },
+  previewColumns: { config: {} },
   csvExport: { config: { filename: 'export.csv', delimiter: ',' } },
-  dataverseOutput: { config: { entity: '', fieldMappings: [] } },
+  dataverseOutput: { config: { orgUrl: '', entity: '', fieldMappings: [] } },
 };
 
 const initial = {
@@ -150,13 +153,16 @@ function snap(p) {
 function prettyName(type) {
   return (
     {
+      dataverseInput: 'Dataverse Input',
       csvInput: 'CSV Input',
       manualData: 'Manual Data',
       selectMap: 'Select / Map',
       filter: 'Filter',
       transform: 'Transform',
-      deduplicate: 'Deduplicate',
+      deduplicate:  'Deduplicate',
+      randomSample: 'Random Sample',
       preview: 'Preview',
+      previewColumns: 'Preview Columns',
       csvExport: 'CSV Export',
       dataverseOutput: 'Dataverse Output',
     }[type] || type
