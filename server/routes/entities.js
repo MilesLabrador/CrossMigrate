@@ -59,4 +59,34 @@ router.get('/entities/:logicalName/fields', async (req, res) => {
   }
 });
 
+// GET /api/entities/:logicalName/views — returns public saved-queries for an entity
+router.get('/entities/:logicalName/views', async (req, res) => {
+  const orgUrl = req.query.orgUrl || undefined;
+  const { logicalName } = req.params;
+  try {
+    const filter = [
+      `returnedtypecode eq '${logicalName}'`,
+      `querytype eq 0`,          // 0 = public/system view
+      `statecode eq 0`,          // active only
+    ].join(' and ');
+
+    const r = await dvRequest({
+      path: `/savedqueries?$filter=${encodeURIComponent(filter)}&$select=name,savedqueryid,fetchxml,description,layoutxml&$orderby=name asc`,
+      orgUrl,
+    });
+
+    const list = (r.data.value || []).map((v) => ({
+      id:          v.savedqueryid,
+      name:        v.name,
+      description: v.description || '',
+      fetchXml:    v.fetchxml || '',
+    }));
+    res.json(list);
+  } catch (err) {
+    const detail = normalizeError(err);
+    console.error('GET /entities/:n/views failed:', detail);
+    res.status(err.response?.status || 500).json({ error: detail });
+  }
+});
+
 export default router;

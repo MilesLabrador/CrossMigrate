@@ -12,6 +12,8 @@ import runPipelineRouter from './routes/runPipeline.js';
 import importDataverseRouter from './routes/importDataverse.js';
 import fetchDataverseRouter from './routes/fetchDataverse.js';
 import mappingsRouter from './routes/mappings.js';
+import settingsRouter         from './routes/settings.js';
+import fetchDataverseViewRouter from './routes/fetchDataverseView.js';
 
 // Allow .env at repo root in addition to server/.env
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,6 +36,8 @@ app.use('/api', runPipelineRouter);
 app.use('/api', importDataverseRouter);
 app.use('/api', fetchDataverseRouter);
 app.use('/api', mappingsRouter);
+app.use('/api', settingsRouter);
+app.use('/api', fetchDataverseViewRouter);
 
 const port = process.env.PORT || 3001;
 app.listen(port, () => {

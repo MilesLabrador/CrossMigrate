@@ -40,6 +40,18 @@ export default function DataverseInputConfig({ nodeId }) {
 
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  const [localOrgUrl, setLocalOrgUrl] = useState(cfg.orgUrl || '');
+  useEffect(() => { setLocalOrgUrl(cfg.orgUrl || ''); }, [cfg.orgUrl]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (localOrgUrl !== (cfg.orgUrl || '')) {
+        updateNodeConfig(nodeId, { orgUrl: localOrgUrl, entity: '', entityLogicalName: '', entityDisplayName: '', select: '' });
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localOrgUrl]);
+
   const [entities, setEntities]         = useState([]);
   const [entitiesLoading, setEntitiesLoading] = useState(false);
   const [entitiesError, setEntitiesError]     = useState(null);
@@ -143,8 +155,8 @@ export default function DataverseInputConfig({ nodeId }) {
           <span className="ml-1 text-slate-600 normal-case font-normal">(blank = default from .env)</span>
         </label>
         <input
-          value={cfg.orgUrl || ''}
-          onChange={(e) => updateNodeConfig(nodeId, { orgUrl: e.target.value, entity: '', entityLogicalName: '', entityDisplayName: '', select: '' })}
+          value={localOrgUrl}
+          onChange={(e) => setLocalOrgUrl(e.target.value)}
           placeholder="e.g. otherorg.crm.dynamics.com"
           className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700 hover:border-slate-500 focus:border-sky-500 text-slate-200 outline-none transition font-mono text-[11px]"
         />

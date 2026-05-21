@@ -10,7 +10,8 @@ export function executeNode(node, inputRows) {
   switch (type) {
     case 'csvInput':
     case 'manualData':
-    case 'dataverseInput': {
+    case 'dataverseInput':
+    case 'dataverseView': {
       // Source nodes carry their rows in node.data.rows (fetched before pipeline run)
       const rows = node.data?.rows || [];
       return { rows, meta: { rowCount: rows.length } };

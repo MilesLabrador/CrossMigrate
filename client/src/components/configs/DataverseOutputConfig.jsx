@@ -54,6 +54,22 @@ export default function DataverseOutputConfig({ nodeId }) {
 
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  const [localOrgUrl, setLocalOrgUrl] = useState(cfg.orgUrl || '');
+  useEffect(() => { setLocalOrgUrl(cfg.orgUrl || ''); }, [cfg.orgUrl]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (localOrgUrl !== (cfg.orgUrl || '')) {
+        state.updateNodeConfig(nodeId, {
+          orgUrl: localOrgUrl,
+          entity: '', entityLogicalName: '', entityDisplayName: '',
+          fieldMappings: [],
+        });
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localOrgUrl]);
+
   // Entity picker state
   const [entities, setEntities]               = useState([]);
   const [entitiesLoading, setEntitiesLoading] = useState(false);
@@ -244,12 +260,8 @@ export default function DataverseOutputConfig({ nodeId }) {
       <div>
         <Label>Environment URL <Hint>(blank = default from .env)</Hint></Label>
         <input
-          value={cfg.orgUrl || ''}
-          onChange={(e) => state.updateNodeConfig(nodeId, {
-            orgUrl: e.target.value,
-            entity: '', entityLogicalName: '', entityDisplayName: '',
-            fieldMappings: [],
-          })}
+          value={localOrgUrl}
+          onChange={(e) => setLocalOrgUrl(e.target.value)}
           placeholder="e.g. otherorg.crm.dynamics.com"
           className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-[11px] text-slate-200 font-mono outline-none focus:border-sky-500 hover:border-slate-500 transition"
         />

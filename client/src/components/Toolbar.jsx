@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Save, FolderOpen, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, LogIn, LogOut, User } from 'lucide-react';
+import { Save, FolderOpen, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, LogIn, LogOut, User, Settings } from 'lucide-react';
 import { usePipelineStore } from '../store/usePipelineStore';
-import { runPipelineStream, fetchDataverseRows } from '../lib/api';
+import { runPipelineStream, fetchDataverseRows, fetchDataverseView } from '../lib/api';
 import SignInModal from './SignInModal';
+import SettingsModal from './SettingsModal';
 
-const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput']);
+const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'dataverseView']);
 
 export default function Toolbar() {
   const {
@@ -20,6 +21,7 @@ export default function Toolbar() {
   const [runBanner, setRunBanner] = useState(null); // { kind, message }
   const [authUser, setAuthUser]   = useState(null); // { name, username } | null
   const [showSignIn, setShowSignIn] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Check auth state on mount
   useEffect(() => {
@@ -53,30 +55,44 @@ export default function Toolbar() {
 
     // ── Auto-fetch unconfigured check ─────────────────────────────────────────
     const unconfigured = nodes.filter(
-      (n) => n.type === 'dataverseInput' && !n.data?.config?.entity
+      (n) =>
+        (n.type === 'dataverseInput' && !n.data?.config?.entity) ||
+        (n.type === 'dataverseView'  && (!n.data?.config?.entity || !n.data?.config?.fetchXml))
     );
     if (unconfigured.length) {
-      showBanner('warn', `${unconfigured.map((n) => n.data?.name).join(', ')} has no entity configured — open its config panel first`);
+      showBanner('warn', `${unconfigured.map((n) => n.data?.name).join(', ')} has no entity/view configured — open its config panel first`);
       setRunning(false);
       return;
     }
 
-    // ── Auto-fetch unfetched dataverseInput nodes ─────────────────────────────
+    // ── Auto-fetch unfetched Dataverse source nodes ───────────────────────────
     const unfetched = nodes.filter(
-      (n) => n.type === 'dataverseInput' && n.data?.config?.entity && !(n.data?.rows?.length)
+      (n) =>
+        (n.type === 'dataverseInput' && n.data?.config?.entity   && !(n.data?.rows?.length)) ||
+        (n.type === 'dataverseView'  && n.data?.config?.fetchXml && !(n.data?.rows?.length))
     );
     if (unfetched.length) {
       showBanner('ok', `Auto-fetching ${unfetched.length} Dataverse source${unfetched.length > 1 ? 's' : ''}…`, 0);
       for (const n of unfetched) {
         try {
           const cfg = n.data.config;
-          const result = await fetchDataverseRows({
-            entity:  cfg.entity,
-            select:  cfg.select  || '',
-            filter:  cfg.filter  || '',
-            top:     cfg.top     || 5000,
-            orgUrl:  cfg.orgUrl  || '',
-          });
+          let result;
+          if (n.type === 'dataverseView') {
+            result = await fetchDataverseView({
+              entityCollection: cfg.entity,
+              savedQueryId:     cfg.viewId,
+              orgUrl:           cfg.orgUrl || '',
+              viewColumns:      cfg.viewColumns || [],
+            });
+          } else {
+            result = await fetchDataverseRows({
+              entity:  cfg.entity,
+              select:  cfg.select  || '',
+              filter:  cfg.filter  || '',
+              top:     cfg.top     || 5000,
+              orgUrl:  cfg.orgUrl  || '',
+            });
+          }
           updateNodeData(n.id, {
             rows:         result.rows,
             columns:      result.columns,
@@ -166,6 +182,7 @@ export default function Toolbar() {
           <Btn onClick={onSave} icon={<Save size={14} />}>{savedFlash ? 'Saved!' : 'Save'}</Btn>
           <Btn onClick={() => load()} icon={<FolderOpen size={14} />}>Load</Btn>
           <Btn onClick={() => { if (confirm('Clear the entire canvas?')) clearCanvas(); }} icon={<Trash2 size={14} />}>Clear</Btn>
+          <Btn onClick={() => setShowSettings(true)} icon={<Settings size={14} />}>Settings</Btn>
 
           {/* Auth */}
           <div className="w-px h-5 bg-slate-700 mx-1" />
@@ -213,6 +230,8 @@ export default function Toolbar() {
           }}
         />
       )}
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>
   );
 }

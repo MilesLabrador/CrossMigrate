@@ -79,6 +79,48 @@ export async function fetchDataverseRows({ entity, select = '', filter = '', top
   return r.json(); // { rows, columns, rowCount }
 }
 
+export async function fetchViews(logicalName, orgUrl = '') {
+  const qs = orgUrl ? `?orgUrl=${encodeURIComponent(orgUrl)}` : '';
+  const r = await fetch(`/api/entities/${encodeURIComponent(logicalName)}/views${qs}`);
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body?.error || `views: ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function fetchDataverseView({ entityCollection, savedQueryId, orgUrl = '', top = 5000, viewColumns = [] }) {
+  const r = await fetch('/api/fetch-dataverse-view', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entityCollection, savedQueryId, orgUrl, top, expectedColumns: viewColumns }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body?.error || `fetch-dataverse-view: ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function fetchSettings() {
+  const r = await fetch('/api/settings');
+  if (!r.ok) throw new Error(`settings: ${r.status}`);
+  return r.json();
+}
+
+export async function saveSettings(values) {
+  const r = await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(values),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `settings: ${r.status}`);
+  }
+  return r.json();
+}
+
 // SSE for Dataverse import
 export async function importToDataverseSSE({ entity, rows, orgUrl = '' }, onEvent) {
   const r = await fetch('/api/import-dataverse', {

@@ -6,6 +6,7 @@ const STORAGE_KEY = 'crossmigrate:pipeline';
 
 export const NODE_DEFAULTS = {
   dataverseInput: { config: { orgUrl: '', entity: '', select: '', filter: '', top: 5000 }, rows: [], columns: [] },
+  dataverseView:  { config: { orgUrl: '', entity: '', entityLogicalName: '', entityDisplayName: '', viewId: '', viewName: '', fetchXml: '', viewColumns: [] }, rows: [], columns: [] },
   csvInput: { config: {}, rows: [], columns: [] },
   manualData: {
     config: {},
@@ -154,6 +155,7 @@ function prettyName(type) {
   return (
     {
       dataverseInput: 'Dataverse Input',
+      dataverseView:  'Dataverse View',
       csvInput: 'CSV Input',
       manualData: 'Manual Data',
       selectMap: 'Select / Map',

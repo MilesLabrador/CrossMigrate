@@ -136,6 +136,14 @@ export async function getUserToken(orgUrl) {
   }
 }
 
+// ── Reset PCA (call when CLIENT_ID / TENANT_ID changes at runtime) ───────────
+export function resetPca() {
+  _pca          = null;
+  _readyPromise = null;
+  currentAccount = null;
+  authState      = { status: 'idle' };
+}
+
 // ── Sign out ──────────────────────────────────────────────────────────────────
 export async function logout() {
   if (currentAccount) {

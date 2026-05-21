@@ -11,9 +11,11 @@ import RandomSampleConfig from './configs/RandomSampleConfig';
 import CSVExportConfig from './configs/CSVExportConfig';
 import DataverseOutputConfig from './configs/DataverseOutputConfig';
 import PreviewConfig from './configs/PreviewConfig';
+import DataverseViewConfig from './configs/DataverseViewConfig';
 
 const REGISTRY = {
   dataverseInput: { title: 'Dataverse Input', Comp: DataverseInputConfig },
+  dataverseView:  { title: 'Dataverse View',  Comp: DataverseViewConfig },
   csvInput: { title: 'CSV Input', Comp: CSVInputConfig },
   manualData: { title: 'Manual Data', Comp: () => <div className="text-xs text-slate-400">Edit cells directly on the node.</div> },
   selectMap: { title: 'Select / Map', Comp: SelectMapConfig },

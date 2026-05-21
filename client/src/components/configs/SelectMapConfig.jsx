@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { distance } from 'fastest-levenshtein';
 import { fetchEntities, fetchEntityFields } from '../../lib/api';
 import { usePipelineStore, getUpstreamColumns, getUpstreamSample } from '../../store/usePipelineStore';
-import { X, Wand2 } from 'lucide-react';
+import { X, Wand2, Search } from 'lucide-react';
 
 function fuzzyMatch(source, candidates) {
   const s = source.toLowerCase().replace(/[_\s-]/g, '');
@@ -34,6 +34,7 @@ export default function SelectMapConfig({ nodeId }) {
   const [entities, setEntities] = useState([]);
   const [fields, setFields] = useState([]);
   const [loadingFields, setLoadingFields] = useState(false);
+  const [search, setSearch] = useState('');
 
   // Initialize mappings from incoming columns when empty
   useEffect(() => {
@@ -81,6 +82,15 @@ export default function SelectMapConfig({ nodeId }) {
 
   const targetCandidates =
     targetMode === 'dataverse' ? fields.map((f) => f.logicalName) : incoming;
+
+  const q = search.toLowerCase();
+  const visibleMappings = mappings
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) =>
+      !q ||
+      m.source.toLowerCase().includes(q) ||
+      (m.target || '').toLowerCase().includes(q)
+    );
 
   return (
     <div className="space-y-4">
@@ -140,6 +150,25 @@ export default function SelectMapConfig({ nodeId }) {
             <Wand2 size={11} /> Auto-match
           </button>
         </div>
+
+        {/* Search */}
+        {mappings.length > 0 && (
+          <div className="relative mb-2">
+            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search source or target…"
+              className="w-full pl-7 pr-7 py-1.5 rounded bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-sky-500 text-slate-300 text-xs outline-none transition placeholder-slate-600"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                <X size={11} />
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-2 text-[10px] uppercase text-slate-500 px-1">
             <div>Source</div>
@@ -152,7 +181,12 @@ export default function SelectMapConfig({ nodeId }) {
               No incoming fields yet — connect an upstream node.
             </div>
           )}
-          {mappings.map((m, i) => (
+          {mappings.length > 0 && visibleMappings.length === 0 && (
+            <div className="text-xs text-slate-500 italic py-3 text-center">
+              No fields match "{search}".
+            </div>
+          )}
+          {visibleMappings.map(({ m, i }) => (
             <div key={i} className={`grid grid-cols-[1fr_auto_1fr_auto] gap-2 items-center ${m.skip ? 'opacity-50' : ''}`}>
               <div className="bg-slate-800 px-2 py-1 rounded text-xs text-slate-200 truncate">
                 <div className="truncate">{m.source}</div>

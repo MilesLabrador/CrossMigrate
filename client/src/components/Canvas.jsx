@@ -11,6 +11,7 @@ import {
 import { usePipelineStore } from '../store/usePipelineStore';
 
 import DataverseInputNode   from '../nodes/DataverseInputNode';
+import DataverseViewNode    from '../nodes/DataverseViewNode';
 import PreviewColumnsNode  from '../nodes/PreviewColumnsNode';
 import RandomSampleNode   from '../nodes/RandomSampleNode';
 import CSVInputNode        from '../nodes/CSVInputNode';
@@ -25,6 +26,7 @@ import DataverseOutputNode from '../nodes/DataverseOutputNode';
 
 const nodeTypes = {
   dataverseInput:  DataverseInputNode,
+  dataverseView:   DataverseViewNode,
   previewColumns:  PreviewColumnsNode,
   randomSample:    RandomSampleNode,
   csvInput:        CSVInputNode,
@@ -148,7 +150,7 @@ function CanvasInner() {
         <MiniMap
           position="bottom-right"
           nodeColor={(n) => {
-            if (['csvInput', 'manualData', 'dataverseInput'].includes(n.type)) return '#22c55e';
+            if (['csvInput', 'manualData', 'dataverseInput', 'dataverseView'].includes(n.type)) return '#22c55e';
             if (['dataverseOutput', 'csvExport'].includes(n.type)) return '#f43f5e';
             return '#64748b';
           }}

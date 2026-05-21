@@ -11,6 +11,7 @@ import {
   Download,
   Eye,
   TableProperties,
+  LayoutList,
 } from 'lucide-react';
 
 export const PALETTE = [
@@ -18,9 +19,10 @@ export const PALETTE = [
     group: 'Sources',
     accent: 'text-emerald-400',
     items: [
-      { type: 'dataverseInput', label: 'Dataverse Input', icon: DatabaseZap,     desc: 'Fetch rows from Dataverse' },
-      { type: 'csvInput',       label: 'CSV Input',        icon: FileSpreadsheet, desc: 'Upload a CSV file' },
-      { type: 'manualData',     label: 'Manual Data',      icon: Pencil,          desc: 'Type rows by hand' },
+      { type: 'dataverseInput', label: 'Dataverse Input', icon: DatabaseZap,  desc: 'Fetch rows from Dataverse' },
+      { type: 'dataverseView',  label: 'Dataverse View',  icon: LayoutList,   desc: 'Fetch using a saved Power Platform view' },
+      { type: 'csvInput',       label: 'CSV Input',       icon: FileSpreadsheet, desc: 'Upload a CSV file' },
+      { type: 'manualData',     label: 'Manual Data',     icon: Pencil,          desc: 'Type rows by hand' },
     ],
   },
   {
