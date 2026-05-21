@@ -2,19 +2,9 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Search, ChevronDown, Check, Loader2, LogIn } from 'lucide-react';
 import { usePipelineStore } from '../../store/usePipelineStore';
 import { fetchEntities, fetchEntityFields } from '../../lib/api';
+import { getCachedEntities as getCached, setCachedEntities as setCached } from '../../lib/entityCache';
 import SignInModal from '../SignInModal';
 import clsx from 'clsx';
-
-// ── Module-level entity cache — survives config panel close/reopen ────────────
-const _entityCache = new Map(); // orgUrl -> { list, ts }
-const ENTITY_TTL   = 5 * 60 * 1000; // 5 min
-function getCached(orgUrl) {
-  const c = _entityCache.get(orgUrl ?? '');
-  return c && Date.now() - c.ts < ENTITY_TTL ? c.list : null;
-}
-function setCached(orgUrl, list) {
-  _entityCache.set(orgUrl ?? '', { list, ts: Date.now() });
-}
 
 // ── MaxRowsInput — owns local string state so "|| 5000" doesn't fight typing ──
 function MaxRowsInput({ value, onChange }) {
