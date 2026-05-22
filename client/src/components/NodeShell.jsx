@@ -51,6 +51,7 @@ export default function NodeShell({
         e.stopPropagation();
         selectNode(id);
       }}
+      onWheel={(e) => e.stopPropagation()}
       className={clsx(
         'animate-scale-in rounded-xl bg-card shadow-node text-slate-100 overflow-hidden border',
         widthClass,

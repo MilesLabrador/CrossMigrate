@@ -7,12 +7,14 @@ import DragGhost from './components/DragGhost';
 import { usePipelineStore } from './store/usePipelineStore';
 
 export default function App() {
-  const { save } = usePipelineStore();
+  const { save, load } = usePipelineStore();
+
+  // Auto-restore last saved pipeline on startup
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Global keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
-      // Cmd/Ctrl+S = save
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         save();

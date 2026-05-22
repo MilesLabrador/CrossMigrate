@@ -12,6 +12,7 @@ import {
   Eye,
   TableProperties,
   LayoutList,
+  BarChart2,
 } from 'lucide-react';
 
 export const PALETTE = [
@@ -36,6 +37,7 @@ export const PALETTE = [
       { type: 'randomSample', label: 'Random Sample',   icon: Shuffle,   desc: 'Grab N random rows' },
       { type: 'preview',        label: 'Preview',         icon: Eye,             desc: 'Inspect rows — passes through' },
       { type: 'previewColumns', label: 'Preview Columns', icon: TableProperties, desc: 'Show column names & types' },
+      { type: 'fieldUsage',     label: 'Field Usage',     icon: BarChart2,       desc: 'Fill rate, unique count & types per field' },
     ],
   },
   {

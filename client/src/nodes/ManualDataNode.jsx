@@ -1,9 +1,36 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Pencil, Plus, X } from 'lucide-react';
 import NodeShell from '../components/NodeShell';
 import { usePipelineStore } from '../store/usePipelineStore';
 
 const MAX_ROWS = 10;
+
+// Buffered column header input — only commits to store on blur so typing isn't interrupted
+function ColHeader({ value, allColumns, onCommit }) {
+  const [draft, setDraft] = useState(value);
+
+  // Sync if the committed value changes from outside (e.g. another col rename)
+  useEffect(() => { setDraft(value); }, [value]);
+
+  const handleBlur = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value && !allColumns.includes(trimmed)) {
+      onCommit(trimmed);
+    } else {
+      setDraft(value); // revert if invalid
+    }
+  };
+
+  return (
+    <input
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      className="w-20 bg-slate-800 px-1 rounded text-slate-200 outline-none focus:bg-slate-700"
+    />
+  );
+}
 
 export default function ManualDataNode({ id, selected }) {
   const { nodes, updateNodeData } = usePipelineStore();
@@ -38,7 +65,8 @@ export default function ManualDataNode({ id, selected }) {
   const renameColumn = (idx, newName) => {
     const cols = [...columns];
     const old = cols[idx];
-    if (!newName.trim() || cols.includes(newName)) return;
+    // Ignore if unchanged, empty, or duplicate
+    if (!newName.trim() || newName === old || cols.some((c, i) => i !== idx && c === newName)) return;
     cols[idx] = newName;
     const newRows = rows.map((r) => {
       const { [old]: v, ...rest } = r;
@@ -62,11 +90,11 @@ export default function ManualDataNode({ id, selected }) {
             <thead>
               <tr>
                 {columns.map((c, i) => (
-                  <th key={c} className="px-1 pb-1">
-                    <input
+                  <th key={i} className="px-1 pb-1">
+                    <ColHeader
                       value={c}
-                      onChange={(e) => renameColumn(i, e.target.value)}
-                      className="w-20 bg-slate-800 px-1 rounded text-slate-200 outline-none"
+                      allColumns={columns}
+                      onCommit={(newName) => renameColumn(i, newName)}
                     />
                   </th>
                 ))}

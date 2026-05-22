@@ -53,6 +53,10 @@ export function executeNode(node, inputRows) {
       const schema = inferSchema(inputRows);
       return { rows: inputRows, meta: { rowCount: inputRows.length, schema } };
     }
+    case 'fieldUsage': {
+      const fieldStats = computeFieldStats(inputRows);
+      return { rows: inputRows, meta: { rowCount: inputRows.length, fieldStats } };
+    }
     case 'csvExport': {
       // Pass through; client handles download
       return { rows: inputRows, meta: { rowCount: inputRows.length } };
@@ -100,11 +104,33 @@ function inferType(values) {
 
 function inferSchema(rows) {
   if (!rows.length) return [];
-  const sample = rows.slice(0, 100); // look at up to 100 rows per column
+  const sample = rows.slice(0, 100);
   const cols = Object.keys(rows[0]);
   return cols.map((col) => ({
     name: col,
     type: inferType(sample.map((r) => r[col])),
     nullCount: rows.filter((r) => r[col] === null || r[col] === undefined || r[col] === '').length,
   }));
+}
+
+function computeFieldStats(rows) {
+  if (!rows.length) return [];
+  const sample = rows.slice(0, 500);
+  const cols = Object.keys(rows[0]);
+  return cols.map((col) => {
+    const values = rows.map((r) => r[col]);
+    const nonEmpty = values.filter((v) => v !== null && v !== undefined && v !== '');
+    const nullCount = values.length - nonEmpty.length;
+    const uniqueCount = new Set(nonEmpty.map((v) => String(v))).size;
+    const type = inferType(sample.map((r) => r[col]));
+    // Up to 3 representative sample values (distinct, non-null)
+    const seen = new Set();
+    const samples = [];
+    for (const v of nonEmpty) {
+      const s = String(v);
+      if (!seen.has(s)) { seen.add(s); samples.push(v); }
+      if (samples.length >= 3) break;
+    }
+    return { name: col, type, nullCount, uniqueCount, samples };
+  });
 }

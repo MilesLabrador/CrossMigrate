@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Save, FolderOpen, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, LogIn, LogOut, User, Settings } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Save, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, LogIn, LogOut, User, Settings, Globe, Plus, Pencil, Trash } from 'lucide-react';
 import { usePipelineStore } from '../store/usePipelineStore';
 import { runPipelineStream, fetchDataverseRows, fetchDataverseView } from '../lib/api';
 import SignInModal from './SignInModal';
@@ -10,18 +10,23 @@ const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'datav
 export default function Toolbar() {
   const {
     projectName, setProjectName,
-    save, load, clearCanvas,
+    save, clearCanvas,
     nodes, edges,
     setRunning, running,
     setNodeStatus, resetNodeStatuses,
     updateNodeData,
+    environments, activeEnvId, setActiveEnv, addEnvironment, updateEnvironment, removeEnvironment,
   } = usePipelineStore();
 
   const [savedFlash, setSavedFlash] = useState(false);
+  const [savedAt, setSavedAt] = useState(null);
   const [runBanner, setRunBanner] = useState(null); // { kind, message }
   const [authUser, setAuthUser]   = useState(null); // { name, username } | null
   const [showSignIn, setShowSignIn] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showEnvMenu, setShowEnvMenu] = useState(false);
+  const [envEdit, setEnvEdit] = useState(null); // { id?, name, orgUrl } — null = closed
+  const envMenuRef = useRef(null);
 
   // Check auth state on mount
   useEffect(() => {
@@ -41,10 +46,36 @@ export default function Toolbar() {
     if (ttl > 0) setTimeout(() => setRunBanner(null), ttl);
   };
 
+  // Close env menu on outside click
+  useEffect(() => {
+    if (!showEnvMenu) return;
+    const handler = (e) => {
+      if (envMenuRef.current && !envMenuRef.current.contains(e.target)) setShowEnvMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showEnvMenu]);
+
+  const activeEnv = environments.find((e) => e.id === activeEnvId);
+
   const onSave = () => {
     save();
     setSavedFlash(true);
+    setSavedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     setTimeout(() => setSavedFlash(false), 1200);
+  };
+
+  const onSaveEnv = () => {
+    if (!envEdit) return;
+    const name = envEdit.name.trim();
+    const orgUrl = envEdit.orgUrl.trim();
+    if (!name || !orgUrl) return;
+    if (envEdit.id) {
+      updateEnvironment(envEdit.id, { name, orgUrl });
+    } else {
+      addEnvironment(name, orgUrl);
+    }
+    setEnvEdit(null);
   };
 
   const onRun = async () => {
@@ -179,10 +210,67 @@ export default function Toolbar() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Btn onClick={onSave} icon={<Save size={14} />}>{savedFlash ? 'Saved!' : 'Save'}</Btn>
-          <Btn onClick={() => load()} icon={<FolderOpen size={14} />}>Load</Btn>
+          {/* Save with timestamp tooltip */}
+          <button
+            onClick={onSave}
+            title={savedAt ? `Last saved at ${savedAt}` : 'Save pipeline (Ctrl+S)'}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition"
+          >
+            {savedFlash ? <CheckCircle2 size={14} className="text-emerald-400" /> : <Save size={14} />}
+            {savedFlash ? 'Saved!' : savedAt ? `Saved ${savedAt}` : 'Save'}
+          </button>
           <Btn onClick={() => { if (confirm('Clear the entire canvas?')) clearCanvas(); }} icon={<Trash2 size={14} />}>Clear</Btn>
           <Btn onClick={() => setShowSettings(true)} icon={<Settings size={14} />}>Settings</Btn>
+
+          {/* Environment selector */}
+          <div className="relative" ref={envMenuRef}>
+            <button
+              onClick={() => setShowEnvMenu((v) => !v)}
+              title="Switch environment"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition"
+            >
+              <Globe size={14} className={activeEnv ? 'text-emerald-400' : 'text-slate-500'} />
+              <span className="max-w-[100px] truncate">{activeEnv?.name || 'Environment'}</span>
+            </button>
+            {showEnvMenu && (
+              <div className="absolute right-0 top-full mt-1 w-72 bg-[#1e2130] border border-slate-700 rounded-xl shadow-2xl z-50 p-2 space-y-1">
+                {environments.length === 0 && (
+                  <div className="text-[11px] text-slate-500 px-2 py-1.5">No environments yet</div>
+                )}
+                {environments.map((env) => (
+                  <div
+                    key={env.id}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer group ${env.id === activeEnvId ? 'bg-emerald-900/40 text-emerald-300' : 'text-slate-300 hover:bg-slate-800'}`}
+                    onClick={() => { setActiveEnv(env.id); setShowEnvMenu(false); }}
+                  >
+                    <Globe size={12} className={env.id === activeEnvId ? 'text-emerald-400' : 'text-slate-500'} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium truncate">{env.name}</div>
+                      <div className="text-[10px] text-slate-600 truncate font-mono">{env.orgUrl}</div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEnvEdit({ id: env.id, name: env.name, orgUrl: env.orgUrl }); setShowEnvMenu(false); }}
+                        className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-slate-200"
+                      ><Pencil size={11} /></button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeEnvironment(env.id); }}
+                        className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-rose-400"
+                      ><Trash size={11} /></button>
+                    </div>
+                  </div>
+                ))}
+                <div className="border-t border-slate-800 pt-1 mt-1">
+                  <button
+                    onClick={() => { setEnvEdit({ name: '', orgUrl: '' }); setShowEnvMenu(false); }}
+                    className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-lg text-[11px] text-sky-400 hover:bg-slate-800 transition"
+                  >
+                    <Plus size={11} /> Add environment
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Auth */}
           <div className="w-px h-5 bg-slate-700 mx-1" />
@@ -232,6 +320,44 @@ export default function Toolbar() {
       )}
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+
+      {/* Environment add/edit modal */}
+      {envEdit !== null && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-[#1e2130] border border-slate-700 rounded-xl w-[380px] shadow-2xl p-6 space-y-4">
+            <div className="font-semibold text-slate-100">{envEdit.id ? 'Edit Environment' : 'Add Environment'}</div>
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Name</label>
+              <input
+                autoFocus
+                value={envEdit.name}
+                onChange={(e) => setEnvEdit((v) => ({ ...v, name: e.target.value }))}
+                placeholder="Production"
+                className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 hover:border-slate-500 focus:border-sky-500 text-slate-200 outline-none transition text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Environment URL</label>
+              <input
+                value={envEdit.orgUrl}
+                onChange={(e) => setEnvEdit((v) => ({ ...v, orgUrl: e.target.value }))}
+                placeholder="yourorg.crm.dynamics.com"
+                className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 hover:border-slate-500 focus:border-sky-500 text-slate-200 outline-none transition text-sm font-mono"
+                onKeyDown={(e) => { if (e.key === 'Enter') onSaveEnv(); if (e.key === 'Escape') setEnvEdit(null); }}
+              />
+              <p className="text-[10px] text-slate-600 mt-1">Just the hostname — e.g. yourorg.crm.dynamics.com</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setEnvEdit(null)} className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm transition">Cancel</button>
+              <button
+                onClick={onSaveEnv}
+                disabled={!envEdit.name.trim() || !envEdit.orgUrl.trim()}
+                className="px-4 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-sm font-medium transition"
+              >{envEdit.id ? 'Update' : 'Add'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

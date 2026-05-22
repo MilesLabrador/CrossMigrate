@@ -21,6 +21,7 @@ import FilterNode          from '../nodes/FilterNode';
 import TransformNode       from '../nodes/TransformNode';
 import DeduplicateNode     from '../nodes/DeduplicateNode';
 import PreviewNode         from '../nodes/PreviewNode';
+import FieldUsageNode      from '../nodes/FieldUsageNode';
 import CSVExportNode       from '../nodes/CSVExportNode';
 import DataverseOutputNode from '../nodes/DataverseOutputNode';
 
@@ -36,6 +37,7 @@ const nodeTypes = {
   transform:       TransformNode,
   deduplicate:     DeduplicateNode,
   preview:         PreviewNode,
+  fieldUsage:      FieldUsageNode,
   csvExport:       CSVExportNode,
   dataverseOutput: DataverseOutputNode,
 };

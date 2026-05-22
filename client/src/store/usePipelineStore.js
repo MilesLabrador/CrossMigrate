@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 
+const ENV_KEY = 'crossmigrate:environments';
+
 const STORAGE_KEY = 'crossmigrate:pipeline';
 
 export const NODE_DEFAULTS = {
@@ -22,7 +24,15 @@ export const NODE_DEFAULTS = {
   previewColumns: { config: {} },
   csvExport: { config: { filename: 'export.csv', delimiter: ',' } },
   dataverseOutput: { config: { orgUrl: '', entity: '', fieldMappings: [] } },
+  fieldUsage: { config: {} },
 };
+
+function loadEnvironments() {
+  try {
+    const raw = localStorage.getItem(ENV_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
 
 const initial = {
   projectName: 'Untitled pipeline',
@@ -32,12 +42,40 @@ const initial = {
   configPanelOpen: false,
   running: false,
   nodeStatus: {},
-  // Pointer-drag state (replaces HTML5 DnD)
-  drag: null, // { type, ghostX, ghostY } while dragging; null when idle
+  drag: null,
 };
 
 export const usePipelineStore = create((set, get) => ({
   ...initial,
+
+  // ─── Environments (persisted separately from pipeline) ─────────────────────
+  environments: loadEnvironments(),  // [{ id, name, orgUrl }]
+  activeEnvId: null,
+
+  addEnvironment: (name, orgUrl) => {
+    const env = { id: nanoid(6), name, orgUrl };
+    const envs = [...get().environments, env];
+    localStorage.setItem(ENV_KEY, JSON.stringify(envs));
+    set({ environments: envs, activeEnvId: env.id });
+  },
+  updateEnvironment: (id, patch) => {
+    const envs = get().environments.map((e) => e.id === id ? { ...e, ...patch } : e);
+    localStorage.setItem(ENV_KEY, JSON.stringify(envs));
+    set({ environments: envs });
+  },
+  removeEnvironment: (id) => {
+    const envs = get().environments.filter((e) => e.id !== id);
+    localStorage.setItem(ENV_KEY, JSON.stringify(envs));
+    const activeEnvId = get().activeEnvId === id
+      ? (envs[0]?.id || null)
+      : get().activeEnvId;
+    set({ environments: envs, activeEnvId });
+  },
+  setActiveEnv: (id) => set({ activeEnvId: id }),
+  getActiveOrgUrl: () => {
+    const { environments, activeEnvId } = get();
+    return environments.find((e) => e.id === activeEnvId)?.orgUrl || '';
+  },
 
   setProjectName: (name) => set({ projectName: name }),
 
@@ -165,6 +203,7 @@ function prettyName(type) {
       randomSample: 'Random Sample',
       preview: 'Preview',
       previewColumns: 'Preview Columns',
+      fieldUsage: 'Field Usage',
       csvExport: 'CSV Export',
       dataverseOutput: 'Dataverse Output',
     }[type] || type
