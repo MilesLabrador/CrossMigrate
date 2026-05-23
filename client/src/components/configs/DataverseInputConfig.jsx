@@ -34,7 +34,7 @@ function MaxRowsInput({ value, onChange }) {
 
 // ── Main config component ─────────────────────────────────────────────────────
 export default function DataverseInputConfig({ nodeId }) {
-  const { nodes, updateNodeConfig } = usePipelineStore();
+  const { nodes, updateNodeConfig, environments, activeEnvId } = usePipelineStore();
   const node = nodes.find((n) => n.id === nodeId);
   const cfg  = node?.data?.config || {};
 
@@ -42,10 +42,11 @@ export default function DataverseInputConfig({ nodeId }) {
 
   const [localOrgUrl, setLocalOrgUrl] = useState(cfg.orgUrl || '');
   useEffect(() => { setLocalOrgUrl(cfg.orgUrl || ''); }, [cfg.orgUrl]);
+  // Only commit the URL — entity/column validation happens in the effects below
   useEffect(() => {
     const t = setTimeout(() => {
       if (localOrgUrl !== (cfg.orgUrl || '')) {
-        updateNodeConfig(nodeId, { orgUrl: localOrgUrl, entity: '', entityLogicalName: '', entityDisplayName: '', select: '' });
+        updateNodeConfig(nodeId, { orgUrl: localOrgUrl });
       }
     }, 600);
     return () => clearTimeout(t);
@@ -85,15 +86,39 @@ export default function DataverseInputConfig({ nodeId }) {
     reloadEntities();
   }, [reloadEntities]);
 
+  // ── When entities reload, check if the selected entity still exists ──────────
+  useEffect(() => {
+    if (!entities.length || !cfg.entityLogicalName) return;
+    const found = entities.find((e) => e.logicalName === cfg.entityLogicalName);
+    if (!found) {
+      updateNodeConfig(nodeId, { entity: '', entityLogicalName: '', entityDisplayName: '', select: '' });
+      setSelectedFields([]);
+    }
+  // Only re-run when the entity list itself changes (i.e. after a URL switch)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entities]);
+
   // ── Load fields when entity or orgUrl changes ────────────────────────────────
   const entityKey = cfg.entityLogicalName || cfg.entity;
   useEffect(() => {
     if (!entityKey) { setFields([]); return; }
     setFieldsLoading(true);
     fetchEntityFields(entityKey, cfg.orgUrl || '')
-      .then(setFields)
+      .then((f) => {
+        setFields(f);
+        // Trim any previously-selected columns that don't exist in this environment
+        if (selectedFields.length) {
+          const valid = new Set(f.map((field) => field.logicalName));
+          const kept = selectedFields.filter((s) => valid.has(s));
+          if (kept.length !== selectedFields.length) {
+            setSelectedFields(kept);
+            updateNodeConfig(nodeId, { select: kept.join(',') });
+          }
+        }
+      })
       .catch(() => setFields([]))
       .finally(() => setFieldsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityKey, cfg.orgUrl]);
 
   // ── Close dropdown on outside click ─────────────────────────────────────────
@@ -154,6 +179,24 @@ export default function DataverseInputConfig({ nodeId }) {
           Environment URL
           <span className="ml-1 text-slate-600 normal-case font-normal">(blank = default from .env)</span>
         </label>
+        {environments.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            {environments.map((env) => (
+              <button
+                key={env.id}
+                type="button"
+                onClick={() => setLocalOrgUrl(env.orgUrl)}
+                className={`px-2 py-0.5 rounded text-[10px] border transition ${
+                  localOrgUrl === env.orgUrl
+                    ? 'bg-emerald-900/50 border-emerald-700 text-emerald-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                }`}
+              >
+                {env.name}
+              </button>
+            ))}
+          </div>
+        )}
         <input
           value={localOrgUrl}
           onChange={(e) => setLocalOrgUrl(e.target.value)}

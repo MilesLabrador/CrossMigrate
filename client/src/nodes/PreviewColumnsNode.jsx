@@ -36,7 +36,6 @@ export default function PreviewColumnsNode({ id, selected }) {
           </div>
           <div
             className="space-y-1 max-h-64 overflow-y-auto pr-0.5"
-            onWheelCapture={(e) => e.stopPropagation()}
           >
             {schema.map((col) => (
               <div key={col.name} className="flex items-center gap-2">

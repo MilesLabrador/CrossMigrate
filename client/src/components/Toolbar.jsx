@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, LogIn, LogOut, User, Settings, Globe, Plus, Pencil, Trash } from 'lucide-react';
+import { Save, Download, Upload, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, LogIn, LogOut, User, Settings, Globe, Plus, Pencil, Trash } from 'lucide-react';
 import { usePipelineStore } from '../store/usePipelineStore';
 import { runPipelineStream, fetchDataverseRows, fetchDataverseView } from '../lib/api';
 import SignInModal from './SignInModal';
@@ -10,7 +10,7 @@ const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'datav
 export default function Toolbar() {
   const {
     projectName, setProjectName,
-    save, clearCanvas,
+    save, clearCanvas, loadFromObject, serialize,
     nodes, edges,
     setRunning, running,
     setNodeStatus, resetNodeStatuses,
@@ -27,6 +27,7 @@ export default function Toolbar() {
   const [showEnvMenu, setShowEnvMenu] = useState(false);
   const [envEdit, setEnvEdit] = useState(null); // { id?, name, orgUrl } — null = closed
   const envMenuRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Check auth state on mount
   useEffect(() => {
@@ -63,6 +64,35 @@ export default function Toolbar() {
     setSavedFlash(true);
     setSavedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     setTimeout(() => setSavedFlash(false), 1200);
+  };
+
+  const onExportFile = () => {
+    const data = serialize();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.projectName || 'pipeline'}.crossmigrate.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onImportFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.nodes || !data.edges) throw new Error('Invalid pipeline file');
+        loadFromObject(data);
+        showBanner('ok', `Loaded "${data.projectName || file.name}"`);
+      } catch (err) {
+        showBanner('error', `Could not load file: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const onSaveEnv = () => {
@@ -219,6 +249,9 @@ export default function Toolbar() {
             {savedFlash ? <CheckCircle2 size={14} className="text-emerald-400" /> : <Save size={14} />}
             {savedFlash ? 'Saved!' : savedAt ? `Saved ${savedAt}` : 'Save'}
           </button>
+          <Btn onClick={onExportFile} icon={<Download size={14} />}>Export</Btn>
+          <Btn onClick={() => fileInputRef.current?.click()} icon={<Upload size={14} />}>Import</Btn>
+          <input ref={fileInputRef} type="file" accept=".json,.crossmigrate.json" onChange={onImportFile} className="hidden" />
           <Btn onClick={() => { if (confirm('Clear the entire canvas?')) clearCanvas(); }} icon={<Trash2 size={14} />}>Clear</Btn>
           <Btn onClick={() => setShowSettings(true)} icon={<Settings size={14} />}>Settings</Btn>
 

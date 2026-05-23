@@ -19,3 +19,9 @@ Drag nodes from the left palette onto the canvas, connect them with edges, click
 
 CSV input → SelectMap → Filter → DataverseOutput (entity: `contacts`) using
 `~/Projects/crossmigration/data/test_contacts.csv`.
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
+
+Copyright © 2026 Miles Labrador. All rights reserved.

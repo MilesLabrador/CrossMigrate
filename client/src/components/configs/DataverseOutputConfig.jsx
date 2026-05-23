@@ -51,6 +51,7 @@ export default function DataverseOutputConfig({ nodeId }) {
   const node     = state.nodes.find((n) => n.id === nodeId);
   const cfg      = node?.data?.config || {};
   const incoming = getUpstreamColumns(nodeId, state);
+  const { environments } = state;
 
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -59,11 +60,7 @@ export default function DataverseOutputConfig({ nodeId }) {
   useEffect(() => {
     const t = setTimeout(() => {
       if (localOrgUrl !== (cfg.orgUrl || '')) {
-        state.updateNodeConfig(nodeId, {
-          orgUrl: localOrgUrl,
-          entity: '', entityLogicalName: '', entityDisplayName: '',
-          fieldMappings: [],
-        });
+        state.updateNodeConfig(nodeId, { orgUrl: localOrgUrl });
       }
     }, 600);
     return () => clearTimeout(t);
@@ -106,6 +103,18 @@ export default function DataverseOutputConfig({ nodeId }) {
     reloadEntities();
   }, [reloadEntities]);
 
+  // ── When entities reload, check if the selected entity still exists ──────────
+  useEffect(() => {
+    if (!entities.length || !cfg.entityLogicalName) return;
+    const found = entities.find((e) => e.logicalName === cfg.entityLogicalName);
+    if (!found) {
+      state.updateNodeConfig(nodeId, {
+        entity: '', entityLogicalName: '', entityDisplayName: '', fieldMappings: [],
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entities]);
+
   // ── Load fields when entity or orgUrl changes ──────────────────────────────
   const entityKey = cfg.entityLogicalName || entityLogicalFromCollection(cfg.entity, entities);
   useEffect(() => {
@@ -114,8 +123,18 @@ export default function DataverseOutputConfig({ nodeId }) {
     fetchEntityFields(entityKey, cfg.orgUrl || '')
       .then((f) => {
         setFields(f);
-        // Auto-populate field mappings if not yet set
-        if (!cfg.fieldMappings?.length || cfg.fieldMappings.length !== incoming.length) {
+        const validTargets = new Set(f.map((x) => x.logicalName));
+        if (cfg.fieldMappings?.length && cfg.fieldMappings.length === incoming.length) {
+          // Validate existing mappings — clear targets that don't exist in this environment
+          const validated = cfg.fieldMappings.map((m) => ({
+            ...m,
+            target: validTargets.has(m.target) ? m.target : '',
+          }));
+          if (validated.some((m, i) => m.target !== cfg.fieldMappings[i].target)) {
+            state.updateNodeConfig(nodeId, { fieldMappings: validated });
+          }
+        } else {
+          // Auto-populate with fuzzy matching when no mappings exist yet
           const candidates = f.map((x) => x.logicalName);
           const auto = incoming.map((src) => ({ source: src, target: fuzzy(src, candidates) || '' }));
           state.updateNodeConfig(nodeId, { fieldMappings: auto });
@@ -259,6 +278,24 @@ export default function DataverseOutputConfig({ nodeId }) {
       {/* Environment URL */}
       <div>
         <Label>Environment URL <Hint>(blank = default from .env)</Hint></Label>
+        {environments.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            {environments.map((env) => (
+              <button
+                key={env.id}
+                type="button"
+                onClick={() => setLocalOrgUrl(env.orgUrl)}
+                className={`px-2 py-0.5 rounded text-[10px] border transition ${
+                  localOrgUrl === env.orgUrl
+                    ? 'bg-emerald-900/50 border-emerald-700 text-emerald-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                }`}
+              >
+                {env.name}
+              </button>
+            ))}
+          </div>
+        )}
         <input
           value={localOrgUrl}
           onChange={(e) => setLocalOrgUrl(e.target.value)}

@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { usePipelineStore } from '../store/usePipelineStore';
 import CSVInputConfig from './configs/CSVInputConfig';
 import DataverseInputConfig from './configs/DataverseInputConfig';
+import SelectColumnsConfig from './configs/SelectColumnsConfig';
 import SelectMapConfig from './configs/SelectMapConfig';
 import FilterConfig from './configs/FilterConfig';
 import TransformConfig from './configs/TransformConfig';
@@ -18,6 +19,7 @@ const REGISTRY = {
   dataverseView:  { title: 'Dataverse View',  Comp: DataverseViewConfig },
   csvInput: { title: 'CSV Input', Comp: CSVInputConfig },
   manualData: { title: 'Manual Data', Comp: () => <div className="text-xs text-slate-400">Edit cells directly on the node.</div> },
+  selectColumns: { title: 'Select Columns', Comp: SelectColumnsConfig },
   selectMap: { title: 'Select / Map', Comp: SelectMapConfig },
   filter: { title: 'Filter', Comp: FilterConfig },
   transform: { title: 'Transform', Comp: TransformConfig },

@@ -30,13 +30,35 @@ html, body, #root {
 }
 
 .react-flow__handle {
-  width: 10px;
-  height: 10px;
-  border: 2px solid #0f1117;
+  width: 14px;
+  height: 14px;
+  border: 2.5px solid #0f1117;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
-.handle-source { background: #22c55e; }
-.handle-transform { background: #94a3b8; }
-.handle-destination { background: #f43f5e; }
+.react-flow__handle:hover {
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.25);
+  cursor: crosshair;
+}
+/* Preserve React Flow's per-direction translate while scaling */
+.react-flow__handle-left:hover   { transform: translate(-50%, -50%) scale(1.45); }
+.react-flow__handle-right:hover  { transform: translate(50%,  -50%) scale(1.45); }
+.react-flow__handle-top:hover    { transform: translate(-50%, -50%) scale(1.45); }
+.react-flow__handle-bottom:hover { transform: translate(-50%,  50%) scale(1.45); }
+.handle-source {
+  background: #22c55e;
+}
+.handle-source:hover {
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
+}
+.handle-transform {
+  background: #94a3b8;
+}
+.handle-destination {
+  background: #f43f5e;
+}
+.handle-destination:hover {
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.3);
+}
 
 .react-flow__minimap {
   background: #1a1d2b !important;

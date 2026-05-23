@@ -16,6 +16,7 @@ import PreviewColumnsNode  from '../nodes/PreviewColumnsNode';
 import RandomSampleNode   from '../nodes/RandomSampleNode';
 import CSVInputNode        from '../nodes/CSVInputNode';
 import ManualDataNode      from '../nodes/ManualDataNode';
+import SelectColumnsNode  from '../nodes/SelectColumnsNode';
 import SelectMapNode       from '../nodes/SelectMapNode';
 import FilterNode          from '../nodes/FilterNode';
 import TransformNode       from '../nodes/TransformNode';
@@ -32,6 +33,7 @@ const nodeTypes = {
   randomSample:    RandomSampleNode,
   csvInput:        CSVInputNode,
   manualData:      ManualDataNode,
+  selectColumns:   SelectColumnsNode,
   selectMap:       SelectMapNode,
   filter:          FilterNode,
   transform:       TransformNode,

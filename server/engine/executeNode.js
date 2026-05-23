@@ -16,6 +16,16 @@ export function executeNode(node, inputRows) {
       const rows = node.data?.rows || [];
       return { rows, meta: { rowCount: rows.length } };
     }
+    case 'selectColumns': {
+      const cols = cfg.columns || [];
+      if (!cols.length) return { rows: inputRows, meta: { rowCount: inputRows.length } };
+      const out = inputRows.map((row) => {
+        const r = {};
+        for (const c of cols) r[c] = row[c];
+        return r;
+      });
+      return { rows: out, meta: { rowCount: out.length } };
+    }
     case 'selectMap': {
       const out = selectMap(inputRows, cfg);
       return { rows: out, meta: { rowCount: out.length } };

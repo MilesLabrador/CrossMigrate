@@ -18,6 +18,7 @@ export const NODE_DEFAULTS = {
   selectMap: { config: { mappings: [] } },
   filter: { config: { combinator: 'AND', conditions: [] } },
   transform: { config: { fieldTransforms: [] } },
+  selectColumns: { config: { columns: [] } },
   deduplicate:  { config: { fields: [], strategy: 'first' } },
   randomSample: { config: { size: 100 } },
   preview: { config: {} },
@@ -152,6 +153,9 @@ export const usePipelineStore = create((set, get) => ({
     set({
       nodes: get().nodes.map((n) => {
         if (!targets.has(n.id)) return n;
+        if (n.type === 'selectColumns') {
+          return { ...n, data: { ...n.data, config: { ...n.data.config, columns: [] } } };
+        }
         if (n.type === 'selectMap') {
           return { ...n, data: { ...n.data, config: { ...n.data.config, mappings: [] } } };
         }
@@ -182,6 +186,13 @@ export const usePipelineStore = create((set, get) => ({
       return false;
     }
   },
+  loadFromObject: ({ projectName, nodes, edges }) => {
+    set({ projectName: projectName || 'Untitled pipeline', nodes: nodes || [], edges: edges || [], nodeStatus: {}, selectedNodeId: null, configPanelOpen: false });
+  },
+  serialize: () => {
+    const { projectName, nodes, edges } = get();
+    return { projectName, nodes, edges };
+  },
 }));
 
 function snap(p) {
@@ -196,6 +207,7 @@ function prettyName(type) {
       dataverseView:  'Dataverse View',
       csvInput: 'CSV Input',
       manualData: 'Manual Data',
+      selectColumns: 'Select Columns',
       selectMap: 'Select / Map',
       filter: 'Filter',
       transform: 'Transform',

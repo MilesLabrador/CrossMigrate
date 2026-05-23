@@ -2,6 +2,7 @@ import {
   FileSpreadsheet,
   Pencil,
   ArrowLeftRight,
+  Columns2,
   Filter as FilterIcon,
   Wand2,
   CopyMinus,
@@ -30,6 +31,7 @@ export const PALETTE = [
     group: 'Transforms',
     accent: 'text-slate-300',
     items: [
+      { type: 'selectColumns', label: 'Select Columns', icon: Columns2,       desc: 'Keep only chosen columns' },
       { type: 'selectMap',   label: 'Select / Map', icon: ArrowLeftRight, desc: 'Map source → target fields' },
       { type: 'filter',      label: 'Filter',        icon: FilterIcon,     desc: 'Keep rows matching conditions' },
       { type: 'transform',   label: 'Transform',     icon: Wand2,          desc: 'Clean & reformat fields' },

@@ -5,6 +5,7 @@ import Canvas from './components/Canvas';
 import ConfigPanel from './components/ConfigPanel';
 import DragGhost from './components/DragGhost';
 import { usePipelineStore } from './store/usePipelineStore';
+import { recordGestureOrigin } from './lib/gestureTracker';
 
 export default function App() {
   const { save, load } = usePipelineStore();
@@ -23,6 +24,13 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [save]);
+
+  // Stamp gesture origin in the capture phase, before any bubble-phase handler runs.
+  // NodeShell reads this to decide whether to block canvas panning.
+  useEffect(() => {
+    window.addEventListener('wheel', recordGestureOrigin, { capture: true, passive: true });
+    return () => window.removeEventListener('wheel', recordGestureOrigin, { capture: true });
+  }, []);
 
   // Block horizontal scroll events that trigger browser back/forward navigation,
   // but allow them when the cursor is over a horizontally scrollable container.

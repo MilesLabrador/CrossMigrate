@@ -13,7 +13,7 @@ function parseColumnsFromFetchXml(xml) {
 }
 
 export default function DataverseViewConfig({ nodeId }) {
-  const { nodes, updateNodeConfig } = usePipelineStore();
+  const { nodes, updateNodeConfig, environments } = usePipelineStore();
   const node = nodes.find((n) => n.id === nodeId);
   const cfg  = node?.data?.config || {};
 
@@ -25,10 +25,11 @@ export default function DataverseViewConfig({ nodeId }) {
   useEffect(() => {
     const t = setTimeout(() => {
       if (localOrgUrl !== (cfg.orgUrl || '')) {
+        // Reset view selection (view GUIDs are environment-specific) but keep the
+        // entity — the validation effect below will clear it if not found in new env
         updateNodeConfig(nodeId, {
           orgUrl: localOrgUrl,
-          entity: '', entityLogicalName: '', entityDisplayName: '',
-          viewId: '', viewName: '', fetchXml: '',
+          viewId: '', viewName: '', fetchXml: '', viewColumns: [],
         });
       }
     }, 600);
@@ -59,6 +60,19 @@ export default function DataverseViewConfig({ nodeId }) {
   }, [cfg.orgUrl]);
 
   useEffect(() => { setEntitiesError(null); reloadEntities(); }, [reloadEntities]);
+
+  // ── When entities reload, check if the selected entity still exists ──────────
+  useEffect(() => {
+    if (!entities.length || !cfg.entityLogicalName) return;
+    const found = entities.find((e) => e.logicalName === cfg.entityLogicalName);
+    if (!found) {
+      updateNodeConfig(nodeId, {
+        entity: '', entityLogicalName: '', entityDisplayName: '',
+        viewId: '', viewName: '', fetchXml: '', viewColumns: [],
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entities]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -166,6 +180,24 @@ export default function DataverseViewConfig({ nodeId }) {
           Environment URL
           <span className="ml-1 text-slate-600 normal-case font-normal">(blank = default from .env)</span>
         </label>
+        {environments.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            {environments.map((env) => (
+              <button
+                key={env.id}
+                type="button"
+                onClick={() => setLocalOrgUrl(env.orgUrl)}
+                className={`px-2 py-0.5 rounded text-[10px] border transition ${
+                  localOrgUrl === env.orgUrl
+                    ? 'bg-emerald-900/50 border-emerald-700 text-emerald-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                }`}
+              >
+                {env.name}
+              </button>
+            ))}
+          </div>
+        )}
         <input
           value={localOrgUrl}
           onChange={(e) => setLocalOrgUrl(e.target.value)}
