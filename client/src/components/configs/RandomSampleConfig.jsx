@@ -23,8 +23,24 @@ export default function RandomSampleConfig({ nodeId }) {
           }}
           className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700 hover:border-slate-500 focus:border-sky-500 text-slate-200 outline-none transition"
         />
+      </div>
+
+      <div>
+        <label className="flex items-center gap-2 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={!!cfg.withReplacement}
+            onChange={(e) => updateNodeConfig(nodeId, { withReplacement: e.target.checked })}
+            className="accent-sky-500 w-3.5 h-3.5"
+          />
+          <span className="text-[11px] text-slate-300 group-hover:text-slate-100 transition">
+            Sample with replacement
+          </span>
+        </label>
         <p className="text-[10px] text-slate-600 mt-1">
-          Picks N rows at random using Fisher-Yates. Returns all rows if input is smaller.
+          {cfg.withReplacement
+            ? 'Rows can appear more than once. Output size always equals sample size.'
+            : 'Each row picked at most once. Returns all rows if input is smaller than sample size.'}
         </p>
       </div>
 

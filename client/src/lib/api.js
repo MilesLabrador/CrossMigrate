@@ -17,6 +17,24 @@ export async function fetchEntityFields(logicalName, orgUrl = '') {
   return r.json();
 }
 
+export async function uploadXlsx(file, { header = true, sheet = '' } = {}) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('header', String(header));
+  if (sheet) fd.append('sheet', sheet);
+  const r = await fetch('/api/upload-xlsx', { method: 'POST', body: fd });
+  if (!r.ok) throw new Error(`upload-xlsx: ${r.status}`);
+  return r.json();
+}
+
+export async function fetchXlsxSheet(fileId, { sheet, header = true } = {}) {
+  const qs = new URLSearchParams({ fileId, header: String(header) });
+  if (sheet) qs.set('sheet', sheet);
+  const r = await fetch(`/api/xlsx-sheet?${qs}`);
+  if (!r.ok) throw new Error(`xlsx-sheet: ${r.status}`);
+  return r.json();
+}
+
 export async function uploadCsv(file, { delimiter = '', header = true, encoding = 'utf8' } = {}) {
   const fd = new FormData();
   fd.append('file', file);

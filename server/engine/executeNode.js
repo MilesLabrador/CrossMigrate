@@ -9,6 +9,7 @@ export function executeNode(node, inputRows) {
   const cfg = node.data?.config || {};
   switch (type) {
     case 'csvInput':
+    case 'xlsxInput':
     case 'manualData':
     case 'dataverseInput':
     case 'dataverseView': {
@@ -50,6 +51,10 @@ export function executeNode(node, inputRows) {
     }
     case 'randomSample': {
       const size = Math.max(1, parseInt(cfg.size) || 100);
+      if (cfg.withReplacement) {
+        const out = sampleWithReplacement(inputRows, size);
+        return { rows: out, meta: { rowCount: out.length, sampledFrom: inputRows.length } };
+      }
       if (inputRows.length <= size) {
         return { rows: inputRows, meta: { rowCount: inputRows.length, note: 'Input smaller than sample size — returned all rows' } };
       }
@@ -88,6 +93,15 @@ function fisherYates(arr, n) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a.slice(0, n);
+}
+
+function sampleWithReplacement(arr, n) {
+  if (!arr.length) return [];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ ...arr[Math.floor(Math.random() * arr.length)] });
+  }
+  return out;
 }
 
 // ─── Schema inference ────────────────────────────────────────────────────────

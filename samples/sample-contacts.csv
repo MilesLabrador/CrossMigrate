@@ -1,0 +1,31 @@
+id,firstName,lastName,email,phone,city,state,country,jobTitle,company,createdOn,score,active
+1,Alice,Anderson,alice.anderson@example.com,555-0101,Seattle,WA,USA,Software Engineer,Contoso,2024-01-15,87,true
+2,Bob,Baker,bob.baker@example.com,555-0102,Portland,OR,USA,Product Manager,Fabrikam,2024-02-03,92,true
+3,Carol,Chen,carol.chen@example.com,555-0103,San Francisco,CA,USA,Designer,Northwind,2024-02-20,78,true
+4,David,Davis,david.davis@example.com,555-0104,Austin,TX,USA,Sales Director,Contoso,2024-03-11,65,false
+5,Eve,Evans,eve.evans@example.com,555-0105,Boston,MA,USA,Data Analyst,Adventure Works,2024-03-22,88,true
+6,Frank,Foster,frank.foster@example.com,555-0106,Chicago,IL,USA,Engineering Manager,Fabrikam,2024-04-05,91,true
+7,Grace,Garcia,grace.garcia@example.com,555-0107,Denver,CO,USA,Marketing Lead,Northwind,2024-04-18,73,true
+8,Henry,Harris,henry.harris@example.com,555-0108,Miami,FL,USA,Account Executive,Contoso,2024-05-02,69,false
+9,Iris,Ito,iris.ito@example.com,555-0109,New York,NY,USA,UX Researcher,Adventure Works,2024-05-14,84,true
+10,Jack,Johnson,jack.johnson@example.com,555-0110,Los Angeles,CA,USA,DevOps Engineer,Fabrikam,2024-06-01,79,true
+11,Karen,Kim,karen.kim@example.com,555-0111,Phoenix,AZ,USA,Project Manager,Northwind,2024-06-15,86,true
+12,Liam,Lopez,liam.lopez@example.com,555-0112,Philadelphia,PA,USA,Software Engineer,Contoso,2024-07-04,90,true
+13,Mia,Miller,mia.miller@example.com,555-0113,San Diego,CA,USA,Product Designer,Adventure Works,2024-07-19,82,false
+14,Noah,Nelson,noah.nelson@example.com,555-0114,Dallas,TX,USA,Backend Engineer,Fabrikam,2024-08-08,75,true
+15,Olivia,Owens,olivia.owens@example.com,555-0115,Houston,TX,USA,QA Engineer,Northwind,2024-08-21,88,true
+16,Peter,Patel,peter.patel@example.com,555-0116,Atlanta,GA,USA,CTO,Contoso,2024-09-05,95,true
+17,Quinn,Quincy,quinn.quincy@example.com,555-0117,Nashville,TN,USA,Frontend Engineer,Adventure Works,2024-09-19,81,true
+18,Rachel,Roberts,,555-0118,Detroit,MI,USA,HR Manager,Fabrikam,2024-10-02,70,false
+19,Sam,Smith,sam.smith@example.com,555-0119,Minneapolis,MN,USA,Data Scientist,Northwind,2024-10-16,93,true
+20,Tina,Turner,tina.turner@example.com,,Saint Louis,MO,USA,Solutions Architect,Contoso,2024-11-01,89,true
+21,Uma,Underwood,uma.underwood@example.com,555-0121,Pittsburgh,PA,USA,Tech Lead,Adventure Works,2024-11-15,87,true
+22,Victor,Vargas,victor.vargas@example.com,555-0122,Tampa,FL,USA,Cloud Engineer,Fabrikam,2024-12-01,84,true
+23,Wendy,Wong,wendy.wong@example.com,555-0123,Charlotte,NC,USA,Business Analyst,Northwind,2024-12-14,76,false
+24,Xavier,Xu,xavier.xu@example.com,555-0124,Salt Lake City,UT,USA,Site Reliability Engineer,Contoso,2025-01-08,91,true
+25,Yara,Young,yara.young@example.com,555-0125,Las Vegas,NV,USA,Mobile Engineer,Adventure Works,2025-01-22,80,true
+26,Zach,Zimmerman,zach.zimmerman@example.com,555-0126,Orlando,FL,USA,Database Admin,Fabrikam,2025-02-05,77,true
+27,Amy,Adams,amy.adams@example.com ,555-0127,Sacramento,CA,USA,Software Engineer,Northwind,2025-02-19,85,true
+28,Ben,Brown,BEN.BROWN@EXAMPLE.COM,555-0128,Indianapolis,IN,USA,Product Manager,Contoso,2025-03-06,88,true
+29,Cathy,Cooper,cathy.cooper@example.com,555-0129,Columbus,OH,USA,Designer,Adventure Works,2025-03-20,72,false
+30,Dan,Dixon,dan.dixon@example.com,555-0130,Kansas City,MO,USA,Engineer,Fabrikam,2025-04-03,90,true

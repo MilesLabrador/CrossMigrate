@@ -1,5 +1,6 @@
 import {
   FileSpreadsheet,
+  Sheet,
   Pencil,
   ArrowLeftRight,
   Columns2,
@@ -24,6 +25,7 @@ export const PALETTE = [
       { type: 'dataverseInput', label: 'Dataverse Input', icon: DatabaseZap,  desc: 'Fetch rows from Dataverse' },
       { type: 'dataverseView',  label: 'Dataverse View',  icon: LayoutList,   desc: 'Fetch using a saved Power Platform view' },
       { type: 'csvInput',       label: 'CSV Input',       icon: FileSpreadsheet, desc: 'Upload a CSV file' },
+      { type: 'xlsxInput',      label: 'XLSX Input',      icon: Sheet,           desc: 'Upload an Excel workbook' },
       { type: 'manualData',     label: 'Manual Data',     icon: Pencil,          desc: 'Type rows by hand' },
     ],
   },

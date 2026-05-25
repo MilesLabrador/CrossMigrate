@@ -9,6 +9,7 @@ const STORAGE_KEY = 'crossmigrate:pipeline';
 export const NODE_DEFAULTS = {
   dataverseInput: { config: { orgUrl: '', entity: '', select: '', filter: '', top: 5000 }, rows: [], columns: [] },
   dataverseView:  { config: { orgUrl: '', entity: '', entityLogicalName: '', entityDisplayName: '', viewId: '', viewName: '', fetchXml: '', viewColumns: [] }, rows: [], columns: [] },
+  xlsxInput: { config: { header: true }, rows: [], columns: [] },
   csvInput: { config: {}, rows: [], columns: [] },
   manualData: {
     config: {},
@@ -20,7 +21,7 @@ export const NODE_DEFAULTS = {
   transform: { config: { fieldTransforms: [] } },
   selectColumns: { config: { columns: [] } },
   deduplicate:  { config: { fields: [], strategy: 'first' } },
-  randomSample: { config: { size: 100 } },
+  randomSample: { config: { size: 100, withReplacement: false } },
   preview: { config: {} },
   previewColumns: { config: {} },
   csvExport: { config: { filename: 'export.csv', delimiter: ',' } },
@@ -205,6 +206,7 @@ function prettyName(type) {
     {
       dataverseInput: 'Dataverse Input',
       dataverseView:  'Dataverse View',
+      xlsxInput: 'XLSX Input',
       csvInput: 'CSV Input',
       manualData: 'Manual Data',
       selectColumns: 'Select Columns',

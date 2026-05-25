@@ -20,7 +20,9 @@ export default function RandomSampleNode({ id, selected }) {
               <span className="text-slate-500"> of {status.meta.sampledFrom.toLocaleString()} rows</span>
             </span>
           ) : (
-            <span className="text-slate-500">Sample {size.toLocaleString()} random rows</span>
+            <span className="text-slate-500">
+              Sample {size.toLocaleString()} random rows{cfg.withReplacement ? ' (w/ replacement)' : ''}
+            </span>
           )}
         </div>
         {status?.meta?.note && (
