@@ -120,21 +120,45 @@ export async function fetchDataverseView({ entityCollection, savedQueryId, orgUr
   return r.json();
 }
 
-export async function fetchSettings() {
-  const r = await fetch('/api/settings');
-  if (!r.ok) throw new Error(`settings: ${r.status}`);
+export async function fetchConnections() {
+  const r = await fetch('/api/connections');
+  if (!r.ok) throw new Error(`connections: ${r.status}`);
   return r.json();
 }
 
-export async function saveSettings(values) {
-  const r = await fetch('/api/settings', {
+export async function startConnectionSignIn(orgUrl = '') {
+  const r = await fetch('/api/connections/sign-in', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(values),
+    body: JSON.stringify({ orgUrl }),
   });
   if (!r.ok) {
     const body = await r.json().catch(() => ({}));
-    throw new Error(body.error || `settings: ${r.status}`);
+    throw new Error(body.error || `sign-in: ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function pollConnectionSignIn() {
+  const r = await fetch('/api/connections/sign-in/status');
+  if (!r.ok) throw new Error(`sign-in status: ${r.status}`);
+  return r.json();
+}
+
+export async function deleteConnection(id) {
+  const r = await fetch(`/api/connections/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `connections: ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function activateConnection(id) {
+  const r = await fetch(`/api/connections/${encodeURIComponent(id)}/activate`, { method: 'POST' });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `connections: ${r.status}`);
   }
   return r.json();
 }

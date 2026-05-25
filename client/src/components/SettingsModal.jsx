@@ -1,85 +1,111 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { fetchSettings, saveSettings } from '../lib/api';
-
-const FIELDS = [
-  {
-    key: 'TENANT_ID',
-    label: 'Tenant ID',
-    placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-    required: true,
-    hint: 'Azure AD tenant. Required for both OAuth and app-token auth.',
-  },
-  {
-    key: 'CLIENT_ID',
-    label: 'Client (App) ID',
-    placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-    required: true,
-    hint: 'Azure AD app registration. Required for both OAuth and app-token auth.',
-  },
-  {
-    key: 'CLIENT_SECRET',
-    label: 'Client Secret',
-    placeholder: 'Leave blank to keep existing value',
-    secret: true,
-    hint: 'Only needed for app-token (daemon) auth. Not required if you sign in via OAuth.',
-  },
-  {
-    key: 'ORG_URL',
-    label: 'Default Environment URL',
-    placeholder: 'yourorg.crm.dynamics.com',
-    hint: 'Fallback when no per-node URL is set. Required to start OAuth sign-in.',
-  },
-];
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Loader2, AlertCircle, Trash2, ExternalLink, Copy, CheckCircle2, LogIn, User } from 'lucide-react';
+import { fetchConnections, startConnectionSignIn, pollConnectionSignIn, deleteConnection, activateConnection } from '../lib/api';
 
 export default function SettingsModal({ onClose }) {
-  const [values, setValues]     = useState({ TENANT_ID: '', CLIENT_ID: '', CLIENT_SECRET: '', ORG_URL: '' });
-  const [hasSecret, setHasSecret] = useState(false);
-  const [showSecret, setShowSecret] = useState(false);
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [saved, setSaved]       = useState(false);
-  const [error, setError]       = useState(null);
+  const [connections, setConnections] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchSettings()
-      .then((data) => {
-        setHasSecret(data._hasSecret || false);
-        setValues({
-          TENANT_ID:     data.TENANT_ID     || '',
-          CLIENT_ID:     data.CLIENT_ID     || '',
-          CLIENT_SECRET: '',  // never pre-fill — server sends '***'
-          ORG_URL:       data.ORG_URL       || '',
-        });
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+  // Sign-in flow state
+  const [signInStage, setSignInStage] = useState(null); // null | 'loading' | 'code' | 'done' | 'error'
+  const [codeInfo, setCodeInfo] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const pollRef = useRef(null);
 
-  const set = (key, val) => setValues((prev) => ({ ...prev, [key]: val }));
-
-  const onSave = async () => {
-    setSaving(true);
-    setError(null);
-    setSaved(false);
+  const load = async () => {
     try {
-      await saveSettings(values);
-      setSaved(true);
-      if (values.CLIENT_SECRET) setHasSecret(true);
-      setTimeout(() => setSaved(false), 2500);
+      const data = await fetchConnections();
+      setConnections(data.connections);
+      setActiveId(data.activeId);
     } catch (e) {
       setError(e.message);
     } finally {
-      setSaving(false);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const onStartSignIn = async () => {
+    setSignInStage('loading');
+    setError(null);
+    setCopied(false);
+    try {
+      const info = await startConnectionSignIn();
+      setCodeInfo(info);
+      setSignInStage('code');
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const s = await pollConnectionSignIn();
+          if (s.status === 'authenticated') {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+            setSignInStage('done');
+            setTimeout(async () => {
+              setSignInStage(null);
+              await load();
+            }, 1200);
+          } else if (s.status === 'error') {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+            setError(s.error || 'Sign-in failed');
+            setSignInStage('error');
+          }
+        } catch { /* network hiccup — keep polling */ }
+      }, 2000);
+    } catch (e) {
+      setError(e.message);
+      setSignInStage('error');
+    }
+  };
+
+  const cancelSignIn = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    setSignInStage(null);
+    setCodeInfo(null);
+    setError(null);
+  };
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(codeInfo?.userCode || '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const onDelete = async (id) => {
+    if (!confirm('Remove this connection?')) return;
+    setError(null);
+    try {
+      await deleteConnection(id);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const onActivate = async (id) => {
+    setError(null);
+    try {
+      await activateConnection(id);
+      setActiveId(id);
+    } catch (e) {
+      setError(e.message);
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-[#1e2130] border border-slate-700 rounded-xl w-[500px] shadow-2xl">
+      <div className="bg-[#1e2130] border border-slate-700 rounded-xl w-[480px] shadow-2xl max-h-[80vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-800">
-          <div className="font-semibold text-slate-100 text-base">Environment Settings</div>
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-800 shrink-0">
+          <div className="font-semibold text-slate-100 text-base">Connections</div>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-100 p-1 rounded hover:bg-slate-800 transition"
@@ -88,47 +114,149 @@ export default function SettingsModal({ onClose }) {
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
-          {/* OAuth note */}
-          <div className="bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 text-[11px] text-slate-400 leading-relaxed">
-            <span className="text-emerald-400 font-semibold">Tip:</span> If you sign in via OAuth (Sign in button), the Client Secret is not required — your delegated user token is used instead. Tenant ID, Client ID, and Environment URL are always needed.
-          </div>
-
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {loading && (
             <div className="flex items-center gap-2 text-slate-400 text-sm py-4">
               <Loader2 size={14} className="animate-spin" /> Loading…
             </div>
           )}
 
-          {!loading && FIELDS.map(({ key, label, placeholder, secret, required, hint }) => (
-            <div key={key}>
-              <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">
-                {label}
-                {required && <span className="ml-1 text-rose-400">*</span>}
-              </label>
-              <div className="relative">
-                <input
-                  type={secret && !showSecret ? 'password' : 'text'}
-                  value={values[key]}
-                  onChange={(e) => set(key, e.target.value)}
-                  placeholder={secret && hasSecret && !values[key] ? '(secret saved — leave blank to keep)' : placeholder}
-                  className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 hover:border-slate-500 focus:border-sky-500 text-slate-200 outline-none transition font-mono text-[11px] pr-9"
-                />
-                {secret && (
-                  <button
-                    type="button"
-                    onClick={() => setShowSecret((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
-                  >
-                    {showSecret ? <EyeOff size={13} /> : <Eye size={13} />}
-                  </button>
-                )}
+          {/* Connection list */}
+          {!loading && connections.length === 0 && !signInStage && (
+            <div className="text-center py-8 space-y-4">
+              <div className="text-slate-500 text-sm">No Microsoft accounts connected.</div>
+              <button
+                onClick={onStartSignIn}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition"
+              >
+                <LogIn size={15} />
+                Sign in with Microsoft
+              </button>
+            </div>
+          )}
+
+          {!loading && connections.map((conn) => (
+            <div
+              key={conn.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition group ${
+                conn.id === activeId
+                  ? 'border-emerald-700/60 bg-emerald-900/20'
+                  : 'border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/50'
+              }`}
+            >
+              <button
+                onClick={() => onActivate(conn.id)}
+                title={conn.id === activeId ? 'Active connection' : 'Set as active'}
+                className="shrink-0"
+              >
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition ${
+                  conn.id === activeId
+                    ? 'border-emerald-400'
+                    : 'border-slate-600 hover:border-slate-400'
+                }`}>
+                  {conn.id === activeId && (
+                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                  )}
+                </div>
+              </button>
+
+              <User size={14} className={conn.id === activeId ? 'text-emerald-400' : 'text-slate-500'} />
+
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-slate-200 truncate">{conn.name}</div>
+                <div className="text-[10px] text-slate-500 truncate mt-0.5">{conn.username}</div>
               </div>
-              {hint && <p className="text-[10px] text-slate-600 mt-1">{hint}</p>}
+
+              <button
+                onClick={() => onDelete(conn.id)}
+                className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 shrink-0"
+              >
+                <Trash2 size={12} />
+              </button>
             </div>
           ))}
 
-          {error && (
+          {/* Sign-in flow (inline) */}
+          {signInStage === 'loading' && (
+            <div className="border border-slate-700/60 rounded-lg p-5">
+              <div className="flex items-center gap-3 text-slate-400">
+                <Loader2 size={16} className="animate-spin shrink-0" />
+                <span className="text-sm">Requesting sign-in code…</span>
+              </div>
+            </div>
+          )}
+
+          {signInStage === 'code' && codeInfo && (
+            <div className="border border-sky-700/40 bg-sky-900/10 rounded-lg p-5 space-y-4">
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Open the link below and enter the code to sign in with your Microsoft account.
+              </p>
+
+              <a
+                href={codeInfo.verificationUri}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 text-sm font-medium transition"
+              >
+                <ExternalLink size={13} />
+                {codeInfo.verificationUri}
+              </a>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-center font-mono text-2xl font-bold tracking-[0.35em] text-white select-all">
+                  {codeInfo.userCode}
+                </div>
+                <button
+                  onClick={copyCode}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition shrink-0"
+                >
+                  {copied
+                    ? <CheckCircle2 size={13} className="text-emerald-400" />
+                    : <Copy size={13} />}
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-500 text-xs">
+                  <Loader2 size={11} className="animate-spin shrink-0" />
+                  Waiting for sign-in…
+                </div>
+                <button
+                  onClick={cancelSignIn}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {signInStage === 'done' && (
+            <div className="border border-emerald-700/40 bg-emerald-900/10 rounded-lg p-5">
+              <div className="flex items-center gap-3 text-emerald-400">
+                <CheckCircle2 size={18} className="shrink-0" />
+                <span className="text-sm font-medium">Signed in successfully!</span>
+              </div>
+            </div>
+          )}
+
+          {signInStage === 'error' && (
+            <div className="border border-rose-700/40 bg-rose-900/10 rounded-lg p-5 space-y-3">
+              <div className="flex items-start gap-2 text-rose-400">
+                <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                <p className="text-sm">{error || 'Sign-in failed.'}</p>
+              </div>
+              <button
+                onClick={() => { setSignInStage(null); setError(null); }}
+                className="text-xs text-slate-400 hover:text-slate-200 transition"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {!signInStage && error && (
             <div className="flex items-start gap-2 text-rose-400 text-xs">
               <AlertCircle size={13} className="shrink-0 mt-0.5" />
               {error}
@@ -137,30 +265,16 @@ export default function SettingsModal({ onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 pb-5">
-          <p className="text-[10px] text-slate-600">Changes are written to the root <code className="text-slate-500">.env</code> file immediately.</p>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end px-6 pb-5 pt-2 border-t border-slate-800 shrink-0">
+          {!signInStage && connections.length > 0 && (
             <button
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm transition"
+              onClick={onStartSignIn}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition"
             >
-              Cancel
+              <LogIn size={13} />
+              Add Account
             </button>
-            <button
-              onClick={onSave}
-              disabled={saving || loading}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium disabled:opacity-50 transition"
-            >
-              {saving ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : saved ? (
-                <CheckCircle2 size={13} className="text-emerald-300" />
-              ) : (
-                <Save size={13} />
-              )}
-              {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

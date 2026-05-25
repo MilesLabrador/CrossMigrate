@@ -13,7 +13,7 @@ import runPipelineRouter from './routes/runPipeline.js';
 import importDataverseRouter from './routes/importDataverse.js';
 import fetchDataverseRouter from './routes/fetchDataverse.js';
 import mappingsRouter from './routes/mappings.js';
-import settingsRouter         from './routes/settings.js';
+import connectionsRouter       from './routes/connections.js';
 import fetchDataverseViewRouter from './routes/fetchDataverseView.js';
 
 // Allow .env at repo root in addition to server/.env
@@ -38,13 +38,10 @@ app.use('/api', runPipelineRouter);
 app.use('/api', importDataverseRouter);
 app.use('/api', fetchDataverseRouter);
 app.use('/api', mappingsRouter);
-app.use('/api', settingsRouter);
+app.use('/api', connectionsRouter);
 app.use('/api', fetchDataverseViewRouter);
 
-const port = process.env.PORT || 3001;
+const port = process.env.SERVER_PORT || 3001;
 app.listen(port, () => {
   console.log(`[crossmigrate] server listening on http://localhost:${port}`);
-  if (!process.env.CLIENT_SECRET) {
-    console.warn('[crossmigrate] WARNING: CLIENT_SECRET is not set; Dataverse calls will fail until you add it to .env');
-  }
 });
