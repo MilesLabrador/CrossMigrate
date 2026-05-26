@@ -6,7 +6,6 @@ Visual ETL pipeline builder with first-class Microsoft Dataverse support.
 
 ```bash
 npm run install:all
-cp .env.example .env   # fill in CLIENT_SECRET
 npm run dev
 ```
 
