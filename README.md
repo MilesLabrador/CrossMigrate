@@ -16,20 +16,15 @@ Drag nodes from the left palette onto the canvas, connect them with edges, click
 
 ## Source Nodes
 
-![Supported source nodes](docs/assets/node-badges-sources.svg)
+![Supported source nodes](docs/assets/node-badges-sources.png)
 
 ## Transform Nodes
 
-![Supported transform nodes](docs/assets/node-badges-transforms.svg)
+![Supported transform nodes](docs/assets/node-badges-transforms.png)
 
 ## Destination Nodes
 
-![Supported destination nodes](docs/assets/node-badges-destinations.svg)
-
-## Test pipeline
-
-CSV input → SelectMap → Filter → DataverseOutput (entity: `contacts`) using
-`~/Projects/crossmigration/data/test_contacts.csv`.
+![Supported destination nodes](docs/assets/node-badges-destinations.png)
 
 ## License
 
