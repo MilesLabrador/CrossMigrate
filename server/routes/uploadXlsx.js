@@ -65,11 +65,20 @@ router.post('/upload-xlsx', upload.single('file'), (req, res) => {
 router.get('/xlsx-sheet', (req, res) => {
   try {
     const { fileId, sheet, header } = req.query;
-    if (!fileId) return res.status(400).json({ error: 'fileId required' });
-    const filePath = path.join(uploadsDir, fileId);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'file not found' });
+    if (!fileId || typeof fileId !== 'string') return res.status(400).json({ error: 'fileId required' });
+    // Strip any directory components — fileId must be a bare filename written
+    // by /upload-xlsx. Without basename(), a caller could read arbitrary files
+    // via "../../etc/passwd".
+    const safeId = path.basename(fileId);
+    const filePath = path.join(uploadsDir, safeId);
+    // Defense-in-depth: ensure the resolved path is still inside uploadsDir.
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(path.resolve(uploadsDir) + path.sep)) {
+      return res.status(400).json({ error: 'invalid fileId' });
+    }
+    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'file not found' });
 
-    const workbook = XLSX.readFile(filePath);
+    const workbook = XLSX.readFile(resolved);
     const sheets = workbook.SheetNames;
     const sheetName = (sheet && sheets.includes(sheet)) ? sheet : sheets[0];
     const useHeader = header !== 'false';

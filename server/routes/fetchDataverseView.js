@@ -16,6 +16,14 @@ router.post('/fetch-dataverse-view', async (req, res) => {
 
   if (!entityCollection) return res.status(400).json({ error: 'entityCollection is required' });
   if (!savedQueryId)     return res.status(400).json({ error: 'savedQueryId is required' });
+  // Validate so callers can't inject path segments or jump to a fully-qualified
+  // URL via dvRequest's `path.startsWith('http')` branch.
+  if (!/^[a-z][a-z0-9_]{0,63}$/.test(entityCollection)) {
+    return res.status(400).json({ error: 'invalid entityCollection' });
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(savedQueryId))) {
+    return res.status(400).json({ error: 'invalid savedQueryId' });
+  }
 
   const maxRows  = Math.min(Number(top) || 5000, 50_000);
   const pageSize = Math.min(maxRows, 5000);

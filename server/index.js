@@ -15,6 +15,7 @@ import fetchDataverseRouter from './routes/fetchDataverse.js';
 import mappingsRouter from './routes/mappings.js';
 import connectionsRouter       from './routes/connections.js';
 import fetchDataverseViewRouter from './routes/fetchDataverseView.js';
+import sourceRouter             from './routes/source.js';
 
 // Allow .env at repo root in addition to server/.env
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,8 +26,30 @@ if (fs.existsSync(rootEnv)) {
 }
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '100mb' }));
+
+// CORS — only the local Vite dev server and same-origin requests.
+// The production setup proxies /api through Vite, so cross-origin requests
+// from a browser should never legitimately hit this server. Restricting the
+// allow-list prevents a malicious page in the user's browser from reaching
+// localhost endpoints (DB credentials, SSRF, file reads).
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // Same-origin / curl / native clients send no Origin header — allow.
+      if (!origin) return cb(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      return cb(new Error(`Origin not allowed: ${origin}`));
+    },
+    credentials: false,
+  }),
+);
+// Pipeline runs can ship large row payloads, but cap to mitigate JSON-parse
+// DoS. Override with JSON_LIMIT if you genuinely need bigger payloads.
+app.use(express.json({ limit: process.env.JSON_LIMIT || '100mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
@@ -40,8 +63,13 @@ app.use('/api', fetchDataverseRouter);
 app.use('/api', mappingsRouter);
 app.use('/api', connectionsRouter);
 app.use('/api', fetchDataverseViewRouter);
+app.use('/api', sourceRouter);
 
 const port = process.env.SERVER_PORT || 3001;
-app.listen(port, () => {
-  console.log(`[crossmigrate] server listening on http://localhost:${port}`);
+// Bind to loopback by default so DB credentials / file-read endpoints are not
+// reachable from other machines on the LAN. Override with HOST=0.0.0.0 only
+// when intentionally exposing the service.
+const host = process.env.HOST || '127.0.0.1';
+app.listen(port, host, () => {
+  console.log(`[crossmigrate] server listening on http://${host}:${port}`);
 });

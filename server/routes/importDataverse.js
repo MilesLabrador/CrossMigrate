@@ -15,10 +15,29 @@ const SYSTEM_READONLY = new Set([
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isGuid = (v) => typeof v === 'string' && GUID_RE.test(v);
 
+// Dataverse identifiers — used in OData literal strings and URL path segments.
+// Reject anything that could break out of the single-quoted literal or inject
+// path segments / query operators.
+const LOGICAL_NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
+const COLLECTION_NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
+function safeLogical(name) {
+  if (typeof name !== 'string' || !LOGICAL_NAME_RE.test(name)) {
+    throw new Error(`invalid logical name: ${name}`);
+  }
+  return name;
+}
+function safeCollection(name) {
+  if (typeof name !== 'string' || !COLLECTION_NAME_RE.test(name)) {
+    throw new Error(`invalid entity collection: ${name}`);
+  }
+  return name;
+}
+
 // ── Fetch Lookup field → target collection mapping for an entity ─────────────
 // e.g. { lm_bill: 'lm_bills', ownerid: 'systemusers' }
 async function buildLookupMap(entityLogicalName, orgUrl) {
   try {
+    safeLogical(entityLogicalName);
     // 1. Get all Lookup attributes and their target entity logical names
     const attrRes = await dvRequest({
       path: `/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,Targets`,
@@ -31,8 +50,13 @@ async function buildLookupMap(entityLogicalName, orgUrl) {
     const targetNames = [...new Set(lookups.flatMap((l) => l.Targets || []))];
     if (!targetNames.length) return new Map();
 
-    // 3. Resolve each target's LogicalCollectionName in one request
-    const filter = targetNames.map((n) => `LogicalName eq '${n}'`).join(' or ');
+    // 3. Resolve each target's LogicalCollectionName in one request.
+    // Validate each name before interpolating into the OData filter literal.
+    const filter = targetNames
+      .filter((n) => LOGICAL_NAME_RE.test(n))
+      .map((n) => `LogicalName eq '${n}'`)
+      .join(' or ');
+    if (!filter) return new Map();
     const entRes = await dvRequest({
       path: `/EntityDefinitions?$select=LogicalName,LogicalCollectionName&$filter=${filter}`,
       orgUrl,
@@ -80,6 +104,7 @@ function transformRow(row, lookupMap) {
 // ── Resolve entity logical name from its collection name ─────────────────────
 async function resolveLogicalName(collectionName, orgUrl) {
   try {
+    safeCollection(collectionName);
     const r = await dvRequest({
       path: `/EntityDefinitions?$select=LogicalName,LogicalCollectionName&$filter=LogicalCollectionName eq '${collectionName}'`,
       orgUrl,
@@ -128,6 +153,12 @@ router.post('/import-dataverse', async (req, res) => {
 
   if (!entity) {
     send({ type: 'error', error: 'entity is required' });
+    return res.end();
+  }
+  try {
+    safeCollection(entity);
+  } catch (err) {
+    send({ type: 'error', error: err.message });
     return res.end();
   }
 

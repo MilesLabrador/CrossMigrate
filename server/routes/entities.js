@@ -12,6 +12,20 @@ function normalizeError(err) {
 
 const router = express.Router();
 
+// Dataverse logical names are lowercase letters, digits and underscores,
+// optionally prefixed with a publisher prefix ("xx_"). Reject anything else
+// so it can't break out of the single-quoted OData literal and inject extra
+// filter clauses or path segments.
+const LOGICAL_NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
+function assertLogicalName(name) {
+  if (typeof name !== 'string' || !LOGICAL_NAME_RE.test(name)) {
+    const err = new Error('invalid logical name');
+    err.status = 400;
+    throw err;
+  }
+  return name;
+}
+
 router.get('/entities', async (req, res) => {
   const orgUrl = req.query.orgUrl || undefined;
   try {
@@ -37,7 +51,7 @@ router.get('/entities', async (req, res) => {
 router.get('/entities/:logicalName/fields', async (req, res) => {
   const orgUrl = req.query.orgUrl || undefined;
   try {
-    const { logicalName } = req.params;
+    const logicalName = assertLogicalName(req.params.logicalName);
     const r = await dvRequest({
       path: `/EntityDefinitions(LogicalName='${logicalName}')/Attributes?$select=LogicalName,DisplayName,RequiredLevel,AttributeType`,
       orgUrl,
@@ -62,7 +76,12 @@ router.get('/entities/:logicalName/fields', async (req, res) => {
 // GET /api/entities/:logicalName/views — returns public saved-queries for an entity
 router.get('/entities/:logicalName/views', async (req, res) => {
   const orgUrl = req.query.orgUrl || undefined;
-  const { logicalName } = req.params;
+  let logicalName;
+  try {
+    logicalName = assertLogicalName(req.params.logicalName);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
   try {
     const filter = [
       `returnedtypecode eq '${logicalName}'`,

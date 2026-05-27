@@ -10,6 +10,7 @@ export function executeNode(node, inputRows) {
   switch (type) {
     case 'csvInput':
     case 'xlsxInput':
+    case 'sqlInput':
     case 'manualData':
     case 'dataverseInput':
     case 'dataverseView': {
@@ -78,6 +79,10 @@ export function executeNode(node, inputRows) {
     }
     case 'dataverseOutput': {
       // Pipeline run does NOT import; client posts /api/import-dataverse afterwards
+      return { rows: inputRows, meta: { rowCount: inputRows.length, ready: true } };
+    }
+    case 'sqlOutput': {
+      // Pipeline run does NOT write; client posts /api/sql/write afterwards
       return { rows: inputRows, meta: { rowCount: inputRows.length, ready: true } };
     }
     default:

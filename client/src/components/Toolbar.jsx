@@ -5,7 +5,7 @@ import { runPipelineStream, fetchDataverseRows, fetchDataverseView } from '../li
 import SignInModal from './SignInModal';
 import SettingsModal from './SettingsModal';
 
-const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'dataverseView']);
+const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'dataverseView', 'sqlInput']);
 
 export default function Toolbar() {
   const {

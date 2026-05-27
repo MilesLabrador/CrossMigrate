@@ -10,6 +10,8 @@ import {
   Shuffle,
   Database,
   DatabaseZap,
+  HardDrive,
+  HardDriveUpload,
   Download,
   Eye,
   TableProperties,
@@ -26,6 +28,7 @@ export const PALETTE = [
       { type: 'dataverseView',  label: 'Dataverse View',  icon: LayoutList,   desc: 'Fetch using a saved Power Platform view' },
       { type: 'csvInput',       label: 'CSV Input',       icon: FileSpreadsheet, desc: 'Upload a CSV file' },
       { type: 'xlsxInput',      label: 'XLSX Input',      icon: Sheet,           desc: 'Upload an Excel workbook' },
+      { type: 'sqlInput',        label: 'SQL Input',        icon: HardDrive,       desc: 'Query a SQL database' },
       { type: 'manualData',     label: 'Manual Data',     icon: Pencil,          desc: 'Type rows by hand' },
     ],
   },
@@ -48,8 +51,9 @@ export const PALETTE = [
     group: 'Destinations',
     accent: 'text-rose-400',
     items: [
-      { type: 'dataverseOutput', label: 'Dataverse Output', icon: Database, desc: 'Import into Dataverse' },
-      { type: 'csvExport',       label: 'CSV Export',       icon: Download, desc: 'Download as CSV' },
+      { type: 'dataverseOutput', label: 'Dataverse Output', icon: Database,         desc: 'Import into Dataverse' },
+      { type: 'csvExport',       label: 'CSV Export',       icon: Download,        desc: 'Download as CSV' },
+      { type: 'sqlOutput',       label: 'SQL Output',       icon: HardDriveUpload, desc: 'Write rows to a SQL database' },
     ],
   },
 ];

@@ -26,6 +26,8 @@ export const NODE_DEFAULTS = {
   previewColumns: { config: {} },
   csvExport: { config: { filename: 'export.csv', delimiter: ',' } },
   dataverseOutput: { config: { orgUrl: '', entity: '', fieldMappings: [] } },
+  sqlInput:  { config: { type: 'postgres', host: 'localhost', port: '5432', user: '', password: '', database: '', table: '' }, rows: [], columns: [] },
+  sqlOutput: { config: { type: 'postgres', host: 'localhost', port: '5432', user: '', password: '', database: '', table: '', mode: 'insert', conflictColumn: '' } },
   fieldUsage: { config: {} },
 };
 
@@ -220,6 +222,8 @@ function prettyName(type) {
       fieldUsage: 'Field Usage',
       csvExport: 'CSV Export',
       dataverseOutput: 'Dataverse Output',
+      sqlInput:  'SQL Input',
+      sqlOutput: 'SQL Output',
     }[type] || type
   );
 }

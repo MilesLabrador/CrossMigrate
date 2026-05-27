@@ -56,6 +56,15 @@ function getPca() {
   return _pca;
 }
 
+// Only allow Dataverse org hostnames as token scope targets — otherwise a
+// caller could request tokens for an arbitrary domain via /api/auth/start.
+const ORG_HOST_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
+function assertOrgHost(org) {
+  if (!ORG_HOST_RE.test(org) || !/\.dynamics\.com$/i.test(org)) {
+    throw new Error(`invalid org host: ${org}`);
+  }
+}
+
 // ── Global auth state ─────────────────────────────────────────────────────────
 let authState      = { status: 'idle' }; // idle | pending | authenticated | error
 let currentAccount = null;
@@ -75,6 +84,7 @@ export async function getAuthState() {
 export async function startDeviceCodeFlow(orgUrl) {
   const org = orgUrl || process.env.ORG_URL;
   if (!org) throw new Error('No org URL provided and ORG_URL is not set in .env');
+  assertOrgHost(org);
 
   const scopes = [`https://${org}/user_impersonation`];
   authState     = { status: 'pending' };
@@ -109,6 +119,7 @@ export async function getUserToken(orgUrl) {
 
   const org = orgUrl || process.env.ORG_URL;
   if (!org || !currentAccount) return null;
+  assertOrgHost(org);
 
   try {
     const result = await getPca().acquireTokenSilent({

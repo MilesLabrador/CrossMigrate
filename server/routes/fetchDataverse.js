@@ -3,6 +3,12 @@ import { dvRequest, dataverseBaseUrl } from '../auth/dataverseAuth.js';
 
 const router = express.Router();
 
+// Reject anything that isn't a plain entity-set name. Prevents the caller from
+// appending path segments ("entity/(guid)/Microsoft.Dynamics.CRM...") or
+// hopping to a fully-qualified URL via the `path.startsWith('http')` branch in
+// dvRequest.
+const COLLECTION_RE = /^[a-z][a-z0-9_]{0,63}$/;
+
 // POST /api/fetch-dataverse
 // Body: { entity, select?, filter?, top? }
 // Fetches rows from a Dataverse table, following OData nextLink pages up to `top` rows.
@@ -11,6 +17,9 @@ router.post('/fetch-dataverse', async (req, res) => {
 
   if (!entity) {
     return res.status(400).json({ error: 'entity is required' });
+  }
+  if (!COLLECTION_RE.test(entity)) {
+    return res.status(400).json({ error: 'invalid entity name' });
   }
 
   const maxRows = Math.min(Number(top) || 5000, 50_000);

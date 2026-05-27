@@ -5,9 +5,21 @@ import { getUserToken } from './msalAuth.js';
 const tokenCache  = new Map(); // orgUrl -> { token, expiresAt }
 const inFlightMap = new Map(); // orgUrl -> Promise<string>
 
+// Accept only bare hostnames pointing at a Dataverse environment so a caller
+// can't redirect token scope or API base to an arbitrary domain (which would
+// leak access tokens via the Authorization header).
+const ORG_HOST_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
+function assertOrgHost(org) {
+  if (!ORG_HOST_RE.test(org) || !/\.dynamics\.com$/i.test(org)) {
+    throw new Error(`invalid org host: ${org}`);
+  }
+  return org;
+}
+
 export async function getAccessToken(orgUrl) {
   const org = orgUrl || process.env.ORG_URL;
   if (!org) throw new Error('No ORG_URL configured');
+  assertOrgHost(org);
 
   const { TENANT_ID, CLIENT_ID, CLIENT_SECRET } = process.env;
   if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET) {
@@ -45,6 +57,7 @@ export async function getAccessToken(orgUrl) {
 
 export function dataverseBaseUrl(orgUrl) {
   const org = orgUrl || process.env.ORG_URL;
+  assertOrgHost(org);
   return `https://${org}/api/data/v9.2`;
 }
 
@@ -70,7 +83,21 @@ export async function dvRequest({ method = 'GET', path, data, params, headers = 
     token = await getAccessToken(orgUrl);
   }
   const base  = dataverseBaseUrl(orgUrl);
-  const url   = path.startsWith('http') ? path : `${base}${path}`;
+  let url;
+  if (path.startsWith('http')) {
+    // Only honour absolute URLs that point back at the same Dataverse host
+    // (used for @odata.nextLink). Prevents an attacker who can influence the
+    // path from redirecting Bearer tokens to arbitrary external hosts.
+    let parsed;
+    try { parsed = new URL(path); } catch { throw new Error('invalid request path'); }
+    const baseHost = new URL(base).host;
+    if (parsed.host !== baseHost || parsed.protocol !== 'https:') {
+      throw new Error('cross-host request blocked');
+    }
+    url = parsed.toString();
+  } else {
+    url = `${base}${path}`;
+  }
   return axios({
     method, url, data, params,
     paramsSerializer: params ? { serialize: odataParamsSerializer } : undefined,

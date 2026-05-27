@@ -163,6 +163,59 @@ export async function activateConnection(id) {
   return r.json();
 }
 
+// SQL source helpers
+export async function sqlConnect({ type, host, port, user, password, database, filename }) {
+  const r = await fetch('/api/source/connect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, host, port, user, password, database, filename }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `source/connect: ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function sqlPreview({ type, host, port, user, password, database, filename, table }) {
+  const r = await fetch('/api/source/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, host, port, user, password, database, filename, table }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `source/preview: ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function sqlExtract({ type, host, port, user, password, database, filename, table, columns }) {
+  const r = await fetch('/api/source/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, host, port, user, password, database, filename, table, columns }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `source/extract: ${r.status}`);
+  }
+  return r.json();
+}
+
+export async function sqlWrite({ type, host, port, user, password, database, filename, table, rows, mode, conflictColumn }) {
+  const r = await fetch('/api/sql/write', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, host, port, user, password, database, filename, table, rows, mode, conflictColumn }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `sql/write: ${r.status}`);
+  }
+  return r.json();
+}
+
 // SSE for Dataverse import
 export async function importToDataverseSSE({ entity, rows, orgUrl = '' }, onEvent) {
   const r = await fetch('/api/import-dataverse', {

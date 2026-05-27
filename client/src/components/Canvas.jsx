@@ -26,6 +26,8 @@ import PreviewNode         from '../nodes/PreviewNode';
 import FieldUsageNode      from '../nodes/FieldUsageNode';
 import CSVExportNode       from '../nodes/CSVExportNode';
 import DataverseOutputNode from '../nodes/DataverseOutputNode';
+import SQLInputNode        from '../nodes/SQLInputNode';
+import SQLOutputNode       from '../nodes/SQLOutputNode';
 
 const nodeTypes = {
   dataverseInput:  DataverseInputNode,
@@ -44,6 +46,8 @@ const nodeTypes = {
   fieldUsage:      FieldUsageNode,
   csvExport:       CSVExportNode,
   dataverseOutput: DataverseOutputNode,
+  sqlInput:        SQLInputNode,
+  sqlOutput:       SQLOutputNode,
 };
 
 function CanvasInner() {

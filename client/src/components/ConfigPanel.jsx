@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import { usePipelineStore } from '../store/usePipelineStore';
 import XLSXInputConfig from './configs/XLSXInputConfig';
 import CSVInputConfig from './configs/CSVInputConfig';
+import SQLInputConfig from './configs/SQLInputConfig';
+import SQLOutputConfig from './configs/SQLOutputConfig';
 import DataverseInputConfig from './configs/DataverseInputConfig';
 import SelectColumnsConfig from './configs/SelectColumnsConfig';
 import SelectMapConfig from './configs/SelectMapConfig';
@@ -20,6 +22,8 @@ const REGISTRY = {
   dataverseView:  { title: 'Dataverse View',  Comp: DataverseViewConfig },
   xlsxInput: { title: 'XLSX Input', Comp: XLSXInputConfig },
   csvInput: { title: 'CSV Input', Comp: CSVInputConfig },
+  sqlInput:  { title: 'SQL Input',  Comp: SQLInputConfig },
+  sqlOutput: { title: 'SQL Output', Comp: SQLOutputConfig },
   manualData: { title: 'Manual Data', Comp: () => <div className="text-xs text-slate-400">Edit cells directly on the node.</div> },
   selectColumns: { title: 'Select Columns', Comp: SelectColumnsConfig },
   selectMap: { title: 'Select / Map', Comp: SelectMapConfig },
