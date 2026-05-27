@@ -14,6 +14,18 @@ npm run dev
 
 Drag nodes from the left palette onto the canvas, connect them with edges, click Run.
 
+## Source Nodes
+
+![Supported source nodes](docs/assets/node-badges-sources.svg)
+
+## Transform Nodes
+
+![Supported transform nodes](docs/assets/node-badges-transforms.svg)
+
+## Destination Nodes
+
+![Supported destination nodes](docs/assets/node-badges-destinations.svg)
+
 ## Test pipeline
 
 CSV input → SelectMap → Filter → DataverseOutput (entity: `contacts`) using

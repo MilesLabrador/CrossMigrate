@@ -1,6 +1,7 @@
 node_modules
 .env
 server/.msal-cache.json
+server/.msal-cache.*.json
 connections.json
 .env.local
 *.log

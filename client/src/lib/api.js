@@ -120,17 +120,43 @@ export async function fetchDataverseView({ entityCollection, savedQueryId, orgUr
   return r.json();
 }
 
+// Server errors that mean "no Microsoft account is signed in". Used by
+// Dataverse-touching components to swap raw error text for a CTA into the
+// Connections manager.
+export function isAuthError(message) {
+  if (!message) return false;
+  const m = String(message);
+  return (
+    m.startsWith('sign-in-required:') ||
+    /sign in to a microsoft account/i.test(m) ||
+    /no\s+ORG_URL\s+configured/i.test(m)
+  );
+}
+
+// Opens the Connections modal from anywhere. The Toolbar listens for this
+// event and toggles `showSettings`. Use this instead of plumbing callbacks
+// through every node config.
+export function openConnectionsModal() {
+  window.dispatchEvent(new CustomEvent('crossmigrate:open-connections'));
+}
+
+export async function fetchServerConfig() {
+  const r = await fetch('/api/config');
+  if (!r.ok) throw new Error(`config: ${r.status}`);
+  return r.json();
+}
+
 export async function fetchConnections() {
   const r = await fetch('/api/connections');
   if (!r.ok) throw new Error(`connections: ${r.status}`);
   return r.json();
 }
 
-export async function startConnectionSignIn(orgUrl = '') {
+export async function startConnectionSignIn(orgUrl = '', { clientId = '', tenantId = '' } = {}) {
   const r = await fetch('/api/connections/sign-in', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orgUrl }),
+    body: JSON.stringify({ orgUrl, clientId, tenantId }),
   });
   if (!r.ok) {
     const body = await r.json().catch(() => ({}));

@@ -53,6 +53,20 @@ app.use(express.json({ limit: process.env.JSON_LIMIT || '100mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
+// Exposes non-secret server config so the UI knows whether ORG_URL is set.
+// When unset, the connection manager prompts for the org host at sign-in.
+app.get('/api/config', (_req, res) => {
+  // `defaultClientId`/`defaultTenantId` reflect either explicit env overrides
+  // or the built-in public-client defaults baked into the auth module. The UI
+  // surfaces these so users can confirm what app registration they'd be
+  // signing in through, and override per connection if desired.
+  res.json({
+    defaultOrgUrl:  process.env.ORG_URL  || '',
+    defaultClientId: process.env.CLIENT_ID || '',
+    defaultTenantId: process.env.TENANT_ID || '',
+  });
+});
+
 app.use('/api', authRouter);
 app.use('/api', entitiesRouter);
 app.use('/api', uploadCsvRouter);

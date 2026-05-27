@@ -21,9 +21,12 @@ export async function getAccessToken(orgUrl) {
   if (!org) throw new Error('No ORG_URL configured');
   assertOrgHost(org);
 
+  // Optional app-only (client_credentials) fallback for headless deployments.
+  // Requires the operator to register a confidential client and set all three
+  // env vars. Default builds rely on user delegated auth instead.
   const { TENANT_ID, CLIENT_ID, CLIENT_SECRET } = process.env;
   if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET) {
-    throw new Error('Missing TENANT_ID / CLIENT_ID / CLIENT_SECRET in env');
+    throw new Error('Sign in to a Microsoft account to access Dataverse (or set TENANT_ID/CLIENT_ID/CLIENT_SECRET for service-principal auth)');
   }
 
   const now = Date.now();

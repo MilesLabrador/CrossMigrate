@@ -7,9 +7,9 @@ const router = express.Router();
 // Kicks off device-code flow; returns { userCode, verificationUri } immediately.
 // Auth completes in the background — poll /api/auth/status.
 router.post('/auth/start', async (req, res) => {
-  const { orgUrl } = req.body || {};
+  const { orgUrl, clientId, tenantId } = req.body || {};
   try {
-    const info = await startDeviceCodeFlow(orgUrl || '');
+    const info = await startDeviceCodeFlow(orgUrl || '', { clientId, tenantId });
     res.json({
       userCode:        info.userCode,
       verificationUri: info.verificationUri,

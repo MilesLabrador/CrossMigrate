@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { DatabaseZap, RefreshCw, AlertCircle, ShieldAlert } from 'lucide-react';
+import { DatabaseZap, RefreshCw, AlertCircle, ShieldAlert, UserPlus } from 'lucide-react';
 import NodeShell from '../components/NodeShell';
 import { usePipelineStore } from '../store/usePipelineStore';
-import { fetchDataverseRows } from '../lib/api';
+import { fetchDataverseRows, isAuthError, openConnectionsModal } from '../lib/api';
 
 export default function DataverseInputNode({ id, selected }) {
   const { nodes, updateNodeData } = usePipelineStore();
@@ -91,21 +91,37 @@ export default function DataverseInputNode({ id, selected }) {
             </div>
           )}
 
-          {error && (
+          {error && !isAuthError(error) && (
             <div className="flex items-start gap-1 text-rose-400 text-[10px]">
               <AlertCircle size={10} className="shrink-0 mt-0.5" />
               <span className="break-all">{error}</span>
             </div>
           )}
 
-          <button
-            onClick={handleFetch}
-            disabled={fetching}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded bg-emerald-700/40 hover:bg-emerald-700/60 text-emerald-300 text-[11px] font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={11} className={fetching ? 'animate-spin' : ''} />
-            {fetching ? 'Fetching…' : rows.length ? 'Re-fetch' : 'Fetch rows'}
-          </button>
+          {error && isAuthError(error) ? (
+            <div className="space-y-1.5">
+              <div className="flex items-start gap-1 text-amber-400 text-[10px]">
+                <AlertCircle size={10} className="shrink-0 mt-0.5" />
+                <span>Can't fetch — no Microsoft account is connected.</span>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); openConnectionsModal(); }}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded bg-sky-700/40 hover:bg-sky-700/60 text-sky-300 text-[11px] font-medium transition"
+              >
+                <UserPlus size={11} />
+                Connect account
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleFetch}
+              disabled={fetching}
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded bg-emerald-700/40 hover:bg-emerald-700/60 text-emerald-300 text-[11px] font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={11} className={fetching ? 'animate-spin' : ''} />
+              {fetching ? 'Fetching…' : rows.length ? 'Re-fetch' : 'Fetch rows'}
+            </button>
+          )}
         </div>
       )}
     </NodeShell>

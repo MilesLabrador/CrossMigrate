@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="94" viewBox="0 0 760 94" role="img" aria-labelledby="title desc">
+  <title id="title">Supported destination nodes</title>
+  <desc id="desc">Node-style badges for Dataverse Output, CSV Export, and SQL Output.</desc>
+  <defs>
+    <filter id="shadow" x="-8%" y="-20%" width="116%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#020617" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .card{fill:#1a1d2b;stroke:#be123c;stroke-opacity:.55;stroke-width:1.2;filter:url(#shadow)}
+      .head{fill:#be123c;fill-opacity:.72}
+      .icon{fill:#ffe4e6}
+      .name{fill:#f8fafc;font:600 14px ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+      .type{fill:#fecdd3;font:700 9px ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:1px}
+      .body{fill:#94a3b8;font:500 11px ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+      .handle{fill:#f43f5e;stroke:#0f1117;stroke-width:4}
+    </style>
+  </defs>
+  <rect width="760" height="94" rx="14" fill="#0f1117"/>
+  <g transform="translate(20 18)">
+    <g>
+      <rect class="card" width="220" height="58" rx="12"/>
+      <rect class="head" width="220" height="30" rx="12"/><path class="head" d="M0 18h220v12H0z"/>
+      <circle class="handle" cx="0" cy="29" r="7"/>
+      <path class="icon" d="M15 9h12c4 0 7 2 7 5s-3 5-7 5H15c-4 0-7-2-7-5s3-5 7-5zm0 3c-2 0-4 1-4 2s2 2 4 2h12c2 0 4-1 4-2s-2-2-4-2H15z"/>
+      <text class="name" x="43" y="20">Dataverse Output</text>
+      <text class="type" x="157" y="21">OUT</text>
+      <text class="body" x="12" y="47">Import into Dataverse</text>
+    </g>
+    <g transform="translate(260 0)">
+      <rect class="card" width="220" height="58" rx="12"/>
+      <rect class="head" width="220" height="30" rx="12"/><path class="head" d="M0 18h220v12H0z"/>
+      <circle class="handle" cx="0" cy="29" r="7"/>
+      <path class="icon" d="M22 8v16l-7-7-3 3 12 12 12-12-3-3-7 7V8z"/>
+      <text class="name" x="43" y="20">CSV Export</text>
+      <text class="type" x="151" y="21">CSV</text>
+      <text class="body" x="12" y="47">Download as CSV</text>
+    </g>
+    <g transform="translate(500 0)">
+      <rect class="card" width="220" height="58" rx="12"/>
+      <rect class="head" width="220" height="30" rx="12"/><path class="head" d="M0 18h220v12H0z"/>
+      <circle class="handle" cx="0" cy="29" r="7"/>
+      <path class="icon" d="M11 10h26v17H11zm4 4h18M15 19h10"/>
+      <text class="name" x="43" y="20">SQL Output</text>
+      <text class="type" x="151" y="21">SQL</text>
+      <text class="body" x="12" y="47">Write rows to SQL</text>
+    </g>
+  </g>
+</svg>

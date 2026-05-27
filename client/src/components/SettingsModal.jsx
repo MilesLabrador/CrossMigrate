@@ -1,24 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Loader2, AlertCircle, Trash2, ExternalLink, Copy, CheckCircle2, LogIn, User } from 'lucide-react';
-import { fetchConnections, startConnectionSignIn, pollConnectionSignIn, deleteConnection, activateConnection } from '../lib/api';
+import { fetchConnections, fetchServerConfig, startConnectionSignIn, pollConnectionSignIn, deleteConnection, activateConnection } from '../lib/api';
+
+// Dataverse org hostnames look like `org.crm.dynamics.com` / `.crm4.` etc.
+const ORG_HOST_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
+function normalizeOrgUrl(input) {
+  // Accept "https://org.crm.dynamics.com/", "org.crm.dynamics.com", etc.
+  let s = String(input || '').trim();
+  if (!s) return '';
+  s = s.replace(/^https?:\/\//i, '').replace(/\/+$/, '').split('/')[0];
+  return s.toLowerCase();
+}
 
 export default function SettingsModal({ onClose }) {
   const [connections, setConnections] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [defaultOrgUrl, setDefaultOrgUrl] = useState('');
+  const [defaultClientId, setDefaultClientId] = useState('');
+  const [defaultTenantId, setDefaultTenantId] = useState('');
 
-  // Sign-in flow state
-  const [signInStage, setSignInStage] = useState(null); // null | 'loading' | 'code' | 'done' | 'error'
+  // Sign-in flow state. `prompt` collects the org URL when one isn't configured
+  // server-side (or the user wants to use a different env).
+  const [signInStage, setSignInStage] = useState(null); // null | 'prompt' | 'loading' | 'code' | 'done' | 'error'
+  const [orgUrlInput, setOrgUrlInput] = useState('');
+  const [orgUrlError, setOrgUrlError] = useState(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [clientIdInput, setClientIdInput] = useState('');
+  const [tenantIdInput, setTenantIdInput] = useState('');
   const [codeInfo, setCodeInfo] = useState(null);
   const [copied, setCopied] = useState(false);
   const pollRef = useRef(null);
 
   const load = async () => {
     try {
-      const data = await fetchConnections();
+      const [data, cfg] = await Promise.all([fetchConnections(), fetchServerConfig().catch(() => ({}))]);
       setConnections(data.connections);
       setActiveId(data.activeId);
+      setDefaultOrgUrl(cfg.defaultOrgUrl || '');
+      setDefaultClientId(cfg.defaultClientId || '');
+      setDefaultTenantId(cfg.defaultTenantId || '');
     } catch (e) {
       setError(e.message);
     } finally {
@@ -32,12 +54,36 @@ export default function SettingsModal({ onClose }) {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  const onStartSignIn = async () => {
-    setSignInStage('loading');
+  const onStartSignIn = () => {
+    // Always open the prompt; pre-fill with the env default when there is one.
+    setOrgUrlInput(defaultOrgUrl || '');
+    setClientIdInput(defaultClientId || '');
+    setTenantIdInput(defaultTenantId || '');
+    setAdvancedOpen(false);
+    setOrgUrlError(null);
     setError(null);
     setCopied(false);
+    setSignInStage('prompt');
+  };
+
+  const onSubmitOrgUrl = async (e) => {
+    e?.preventDefault?.();
+    const org = normalizeOrgUrl(orgUrlInput);
+    if (!org) {
+      setOrgUrlError('Enter your Dataverse environment URL.');
+      return;
+    }
+    if (!ORG_HOST_RE.test(org) || !/\.dynamics\.com$/i.test(org)) {
+      setOrgUrlError('Must be a Dataverse host like yourorg.crm.dynamics.com');
+      return;
+    }
+    setOrgUrlError(null);
+    setSignInStage('loading');
     try {
-      const info = await startConnectionSignIn();
+      const info = await startConnectionSignIn(org, {
+        clientId: clientIdInput.trim(),
+        tenantId: tenantIdInput.trim(),
+      });
       setCodeInfo(info);
       setSignInStage('code');
 
@@ -71,6 +117,7 @@ export default function SettingsModal({ onClose }) {
     setSignInStage(null);
     setCodeInfo(null);
     setError(null);
+    setOrgUrlError(null);
   };
 
   const copyCode = () => {
@@ -165,6 +212,9 @@ export default function SettingsModal({ onClose }) {
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-slate-200 truncate">{conn.name}</div>
                 <div className="text-[10px] text-slate-500 truncate mt-0.5">{conn.username}</div>
+                {conn.orgUrl && (
+                  <div className="text-[10px] text-slate-500 truncate mt-0.5">{conn.orgUrl}</div>
+                )}
               </div>
 
               <button
@@ -175,6 +225,93 @@ export default function SettingsModal({ onClose }) {
               </button>
             </div>
           ))}
+
+          {/* Prompt for org URL before kicking off the device-code flow */}
+          {signInStage === 'prompt' && (
+            <form
+              onSubmit={onSubmitOrgUrl}
+              className="border border-slate-700/60 rounded-lg p-5 space-y-3"
+            >
+              <label className="block text-sm text-slate-300">
+                Dataverse environment URL
+                <input
+                  type="text"
+                  value={orgUrlInput}
+                  onChange={(e) => setOrgUrlInput(e.target.value)}
+                  placeholder="yourorg.crm.dynamics.com"
+                  autoFocus
+                  className="mt-2 w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-600"
+                />
+              </label>
+              {!defaultOrgUrl && (
+                <p className="text-[11px] text-slate-500">
+                  No <code className="text-slate-400">ORG_URL</code> is configured on the server — enter the environment you want to sign in to.
+                </p>
+              )}
+
+              {/* Advanced: override the Azure AD app registration this sign-in
+                  uses. Defaults to the public Azure CLI client + multi-tenant
+                  authority so no app registration is required. */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedOpen((v) => !v)}
+                  className="text-[11px] text-slate-500 hover:text-slate-300 transition"
+                >
+                  {advancedOpen ? '▾' : '▸'} Advanced — app registration
+                </button>
+                {advancedOpen && (
+                  <div className="mt-2 space-y-3 border border-slate-800 rounded-md p-3 bg-slate-900/40">
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      By default, sign-in uses the public <span className="text-slate-300">Microsoft Azure CLI</span> client against the <code className="text-slate-400">organizations</code> authority — no Azure AD app registration is needed. Override only if you want to use your own app.
+                    </p>
+                    <label className="block text-xs text-slate-400">
+                      Client ID (optional)
+                      <input
+                        type="text"
+                        value={clientIdInput}
+                        onChange={(e) => setClientIdInput(e.target.value)}
+                        placeholder={defaultClientId || 'leave blank to use the public client'}
+                        className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-600"
+                      />
+                    </label>
+                    <label className="block text-xs text-slate-400">
+                      Tenant ID (optional)
+                      <input
+                        type="text"
+                        value={tenantIdInput}
+                        onChange={(e) => setTenantIdInput(e.target.value)}
+                        placeholder={defaultTenantId || 'organizations'}
+                        className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-600"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {orgUrlError && (
+                <div className="flex items-start gap-2 text-rose-400 text-xs">
+                  <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                  {orgUrlError}
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={cancelSignIn}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition px-3 py-1.5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition"
+                >
+                  Continue
+                </button>
+              </div>
+            </form>
+          )}
 
           {/* Sign-in flow (inline) */}
           {signInStage === 'loading' && (

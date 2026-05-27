@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Download, Upload, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, LogIn, LogOut, User, Settings, Globe, Plus, Pencil, Trash } from 'lucide-react';
+import { Save, Download, Upload, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, User, UserPlus, Globe, Plus, Pencil, Trash } from 'lucide-react';
 import { usePipelineStore } from '../store/usePipelineStore';
-import { runPipelineStream, fetchDataverseRows, fetchDataverseView } from '../lib/api';
-import SignInModal from './SignInModal';
+import { runPipelineStream, fetchDataverseRows, fetchDataverseView, isAuthError } from '../lib/api';
 import SettingsModal from './SettingsModal';
 
 const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'dataverseView', 'sqlInput']);
@@ -22,25 +21,36 @@ export default function Toolbar() {
   const [savedAt, setSavedAt] = useState(null);
   const [runBanner, setRunBanner] = useState(null); // { kind, message }
   const [authUser, setAuthUser]   = useState(null); // { name, username } | null
-  const [showSignIn, setShowSignIn] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showEnvMenu, setShowEnvMenu] = useState(false);
   const [envEdit, setEnvEdit] = useState(null); // { id?, name, orgUrl } — null = closed
   const envMenuRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Check auth state on mount
+  // Reflect the active connection in the toolbar chip. Re-check whenever the
+  // Connections modal closes so a freshly added/removed account shows up
+  // immediately. We use the connections list (not /api/auth/status) so the
+  // chip stays in sync with what the user sees in the modal.
+  // Allow any component (e.g. Dataverse source nodes that hit an auth error)
+  // to ask the toolbar to open the Connections modal.
   useEffect(() => {
-    fetch('/api/auth/status')
-      .then((r) => r.json())
-      .then((s) => { if (s.status === 'authenticated') setAuthUser(s.user); })
-      .catch(() => {});
+    const open = () => setShowSettings(true);
+    window.addEventListener('crossmigrate:open-connections', open);
+    return () => window.removeEventListener('crossmigrate:open-connections', open);
   }, []);
 
-  const onSignOut = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    setAuthUser(null);
-  };
+  useEffect(() => {
+    if (showSettings) return; // avoid racing the modal's own polling
+    fetch('/api/connections')
+      .then((r) => r.json())
+      .then((data) => {
+        const active = data.connections?.find((c) => c.id === data.activeId)
+          || data.connections?.[0]
+          || null;
+        setAuthUser(active ? { name: active.name, username: active.username } : null);
+      })
+      .catch(() => {});
+  }, [showSettings]);
 
   const showBanner = (kind, message, ttl = 6000) => {
     setRunBanner({ kind, message });
@@ -162,7 +172,11 @@ export default function Toolbar() {
             _debugUrl:    result._debugUrl || null,
           });
         } catch (err) {
-          showBanner('error', `Auto-fetch failed for "${n.data?.name}": ${err.message}`);
+          if (isAuthError(err.message)) {
+            showBanner('warn', `Can't fetch "${n.data?.name}" — no Microsoft account is connected. Click the toolbar account button to sign in.`);
+          } else {
+            showBanner('error', `Auto-fetch failed for "${n.data?.name}": ${err.message}`);
+          }
           setRunning(false);
           return;
         }
@@ -253,7 +267,6 @@ export default function Toolbar() {
           <Btn onClick={() => fileInputRef.current?.click()} icon={<Upload size={14} />}>Import</Btn>
           <input ref={fileInputRef} type="file" accept=".json,.crossmigrate.json" onChange={onImportFile} className="hidden" />
           <Btn onClick={() => { if (confirm('Clear the entire canvas?')) clearCanvas(); }} icon={<Trash2 size={14} />}>Clear</Btn>
-          <Btn onClick={() => setShowSettings(true)} icon={<Settings size={14} />}>Settings</Btn>
 
           {/* Environment selector */}
           <div className="relative" ref={envMenuRef}>
@@ -305,19 +318,25 @@ export default function Toolbar() {
             )}
           </div>
 
-          {/* Auth */}
+          {/* Account — single entry into the connection manager */}
           <div className="w-px h-5 bg-slate-700 mx-1" />
-          {authUser ? (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-800 px-2.5 py-1.5 rounded-md">
-                <User size={12} className="text-emerald-400" />
+          <button
+            onClick={() => setShowSettings(true)}
+            title={authUser ? 'Manage connections' : 'Connect a Microsoft account'}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm transition"
+          >
+            {authUser ? (
+              <>
+                <User size={14} className="text-emerald-400" />
                 <span className="max-w-[140px] truncate">{authUser.name || authUser.username}</span>
-              </div>
-              <Btn onClick={onSignOut} icon={<LogOut size={14} />}>Sign out</Btn>
-            </div>
-          ) : (
-            <Btn onClick={() => setShowSignIn(true)} icon={<LogIn size={14} />}>Sign in</Btn>
-          )}
+              </>
+            ) : (
+              <>
+                <UserPlus size={14} />
+                <span>Connect account</span>
+              </>
+            )}
+          </button>
 
           <div className="w-px h-5 bg-slate-700 mx-1" />
           <button
@@ -341,16 +360,6 @@ export default function Toolbar() {
           </div>
         );
       })()}
-
-      {showSignIn && (
-        <SignInModal
-          onClose={() => setShowSignIn(false)}
-          onAuthenticated={(user) => {
-            setAuthUser(user);
-            setShowSignIn(false);
-          }}
-        />
-      )}
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
