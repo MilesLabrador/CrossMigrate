@@ -1,7 +1,18 @@
 import express from 'express';
-import { createConnection, validateIdent } from '../db/connector.js';
+import { createConnection } from '../db/connector.js';
 
 const router = express.Router();
+
+// Inline identifier guard. Mirrors validateIdent in db/connector.js but keeps
+// the regex test in the same scope as the knex call so static analyzers can
+// see the sanitization at the SQL sink.
+const IDENT_RE = /^[\w$]{1,128}$/;
+function safeIdent(name) {
+  if (typeof name !== 'string' || !IDENT_RE.test(name)) {
+    throw new Error(`Invalid identifier: "${name}"`);
+  }
+  return name;
+}
 
 async function withDb(cfg, fn) {
   const db = createConnection(cfg);
@@ -70,13 +81,13 @@ router.post('/source/preview', async (req, res) => {
   const { type, host, port, user, password, database, filename, table } = req.body;
   if (!type || !table) return res.status(400).json({ error: 'type and table are required' });
   try {
-    validateIdent(table);
+    const safeTable = safeIdent(table);
     const result = await withDb(
       { type, host, port, user, password, database, filename },
       async (db) => {
-        const info = await db(table).columnInfo();
+        const info = await db(safeTable).columnInfo();
         const columns = Object.keys(info);
-        const rows = await db(table).select('*').limit(50);
+        const rows = await db(safeTable).select('*').limit(50);
         return { rows, columns };
       },
     );
@@ -91,12 +102,12 @@ router.post('/source/extract', async (req, res) => {
   const { type, host, port, user, password, database, filename, table, columns } = req.body;
   if (!type || !table) return res.status(400).json({ error: 'type and table are required' });
   try {
-    validateIdent(table);
+    const safeTable = safeIdent(table);
     const safeCols =
-      Array.isArray(columns) && columns.length ? columns.map(validateIdent) : null;
+      Array.isArray(columns) && columns.length ? columns.map(safeIdent) : null;
     const rows = await withDb(
       { type, host, port, user, password, database, filename },
-      (db) => db(table).select(safeCols || '*'),
+      (db) => db(safeTable).select(safeCols || '*'),
     );
     const resultColumns = rows.length ? Object.keys(rows[0]) : (safeCols || []);
     res.json({ rows, columns: resultColumns, rowCount: rows.length });
@@ -111,21 +122,21 @@ router.post('/sql/write', async (req, res) => {
   if (!type || !table) return res.status(400).json({ error: 'type and table are required' });
   if (!Array.isArray(rows) || !rows.length) return res.status(400).json({ error: 'rows must be a non-empty array' });
   try {
-    validateIdent(table);
-    if (conflictColumn) validateIdent(conflictColumn);
+    const safeTable = safeIdent(table);
+    const safeConflict = conflictColumn ? safeIdent(conflictColumn) : null;
 
     await withDb({ type, host, port, user, password, database, filename }, async (db) => {
       if (mode === 'truncate') {
-        await db(table).truncate();
+        await db(safeTable).truncate();
       }
 
       const BATCH = 200;
-      if (mode === 'upsert' && conflictColumn) {
+      if (mode === 'upsert' && safeConflict) {
         for (let i = 0; i < rows.length; i += BATCH) {
-          await db(table).insert(rows.slice(i, i + BATCH)).onConflict(conflictColumn).merge();
+          await db(safeTable).insert(rows.slice(i, i + BATCH)).onConflict(safeConflict).merge();
         }
       } else {
-        await db.batchInsert(table, rows, BATCH);
+        await db.batchInsert(safeTable, rows, BATCH);
       }
     });
 

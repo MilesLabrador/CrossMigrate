@@ -75,6 +75,7 @@ export default function NodeShell({
   const colors = CATEGORY_COLORS[category];
   const [collapsed, setCollapsed] = useState(false);
   const nodeRef = useRef(null);
+  const scrollRef = useRef(null);
   const selectedRef = useRef(selected);
   useEffect(() => { selectedRef.current = selected; }, [selected]);
 
@@ -96,6 +97,73 @@ export default function NodeShell({
     el.addEventListener('wheel', handler, { passive: true });
     return () => el.removeEventListener('wheel', handler);
   }, []);
+
+  // Middle-click-drag inside a scrollable node body scrolls that body instead of
+  // letting React Flow pan the canvas or Windows trigger native middle-click
+  // autoscroll. Only active when the node is selected (matches the wheel
+  // interception rules above) and only meaningful when the body actually has
+  // overflow.
+  useEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    const onDown = (e) => {
+      if (e.button !== 1) return;                  // middle button only
+      if (!selectedRef.current) return;
+      const canScroll =
+        sc.scrollHeight > sc.clientHeight || sc.scrollWidth > sc.clientWidth;
+      if (!canScroll) return;
+
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      // Suppress browser middle-click autoscroll cursor and React Flow pan.
+      e.preventDefault();
+      e.stopPropagation();
+      sc.setPointerCapture?.(e.pointerId);
+      sc.style.cursor = 'grabbing';
+    };
+
+    const onMove = (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      // Same sign as the wheel: dragging the mouse down scrolls content down.
+      sc.scrollTop  += dy;
+      sc.scrollLeft += dx;
+    };
+
+    const stop = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      sc.style.cursor = '';
+      sc.releasePointerCapture?.(e.pointerId);
+    };
+
+    // `auxclick` on middle button can navigate or paste in some browsers —
+    // swallow it for the duration of our drag.
+    const onAuxClick = (e) => { if (e.button === 1) e.preventDefault(); };
+
+    sc.addEventListener('pointerdown', onDown);
+    sc.addEventListener('pointermove', onMove);
+    sc.addEventListener('pointerup',   stop);
+    sc.addEventListener('pointercancel', stop);
+    sc.addEventListener('auxclick',    onAuxClick);
+    return () => {
+      sc.removeEventListener('pointerdown', onDown);
+      sc.removeEventListener('pointermove', onMove);
+      sc.removeEventListener('pointerup',   stop);
+      sc.removeEventListener('pointercancel', stop);
+      sc.removeEventListener('auxclick',    onAuxClick);
+    };
+  }, [collapsed]);
 
   const renderStatusDot = () => {
     if (!status) return <Circle size={10} className="text-slate-500 fill-slate-600" />;
@@ -186,7 +254,10 @@ export default function NodeShell({
 
         {/* Body */}
         {!collapsed && (
-          <div className={clsx('p-3 text-xs', hasHeight && 'flex-1 min-h-0 overflow-auto')}>
+          <div
+            ref={scrollRef}
+            className={clsx('p-3 text-xs', hasHeight && 'flex-1 min-h-0 overflow-auto')}
+          >
             {children}
           </div>
         )}

@@ -45,6 +45,20 @@ export default function SignInModal({ onClose, onAuthenticated, orgUrl = '' }) {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
+  // Only allow https:// URLs from the device-code response into the rendered
+  // anchor — prevents a javascript:/data: href if the upstream response were
+  // ever tampered with.
+  const safeVerificationUri = (() => {
+    const v = codeInfo?.verificationUri;
+    if (typeof v !== 'string') return null;
+    try {
+      const u = new URL(v);
+      return u.protocol === 'https:' ? u.toString() : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const copyCode = () => {
     navigator.clipboard.writeText(codeInfo?.userCode || '');
     setCopied(true);
@@ -80,15 +94,17 @@ export default function SignInModal({ onClose, onAuthenticated, orgUrl = '' }) {
               Open the link below and enter the code to authorize CrossMigrate with your Microsoft account.
             </p>
 
-            <a
-              href={codeInfo.verificationUri}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 text-sm font-medium transition"
-            >
-              <ExternalLink size={13} />
-              {codeInfo.verificationUri}
-            </a>
+            {safeVerificationUri && (
+              <a
+                href={safeVerificationUri}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 text-sm font-medium transition"
+              >
+                <ExternalLink size={13} />
+                {safeVerificationUri}
+              </a>
+            )}
 
             <div className="flex items-center gap-3">
               <div className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-center font-mono text-2xl font-bold tracking-[0.35em] text-white select-all">

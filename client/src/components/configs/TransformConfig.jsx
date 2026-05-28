@@ -1,8 +1,9 @@
 import React from 'react';
 import { Plus, X } from 'lucide-react';
 import { usePipelineStore, getUpstreamColumns } from '../../store/usePipelineStore';
+import ColumnDropdown from '../ColumnDropdown';
 
-const TYPES = ['trim', 'uppercase', 'lowercase', 'date_format', 'replace', 'regex_extract'];
+const TYPES = ['trim', 'uppercase', 'lowercase', 'date_format', 'replace', 'set', 'regex_extract'];
 
 export default function TransformConfig({ nodeId }) {
   const state = usePipelineStore();
@@ -42,26 +43,23 @@ export default function TransformConfig({ nodeId }) {
         {transforms.map((t, i) => (
           <div key={i} className="bg-cardalt rounded p-2 border border-slate-700/60 space-y-1.5">
             <div className="flex gap-1.5 items-center">
-              <select
+              <ColumnDropdown
                 value={t.field || ''}
-                onChange={(e) => set(i, { field: e.target.value })}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-200 min-w-0"
-              >
-                <option value="">— field —</option>
-                {cols.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+                options={cols}
+                onChange={(field) => set(i, { field })}
+                placeholder="— field —"
+                className="flex-1"
+              />
               <select
                 value={t.type}
                 onChange={(e) => set(i, { type: e.target.value, opts: {} })}
-                className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-200"
+                className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-200 shrink-0"
               >
                 {TYPES.map((tp) => (
                   <option key={tp} value={tp}>{tp}</option>
                 ))}
               </select>
-              <button onClick={() => remove(i)} className="text-slate-500 hover:text-rose-400">
+              <button onClick={() => remove(i)} className="text-slate-500 hover:text-rose-400 shrink-0">
                 <X size={14} />
               </button>
             </div>
@@ -80,6 +78,14 @@ export default function TransformConfig({ nodeId }) {
                   className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200"
                 />
               </div>
+            )}
+            {t.type === 'set' && (
+              <input
+                placeholder="value to set"
+                value={t.opts?.value ?? ''}
+                onChange={(e) => setOpts(i, { value: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200"
+              />
             )}
             {t.type === 'replace' && (
               <div className="grid grid-cols-2 gap-1.5">

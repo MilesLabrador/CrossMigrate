@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, X } from 'lucide-react';
 import { usePipelineStore, getUpstreamColumns } from '../../store/usePipelineStore';
+import ColumnDropdown from '../ColumnDropdown';
 
 const OPS = [
   'equals',
@@ -63,36 +64,40 @@ export default function FilterConfig({ nodeId }) {
             <Plus size={11} /> Add condition
           </button>
         </div>
+
         {conditions.length === 0 && (
           <div className="text-xs text-slate-500 italic py-3 text-center">No conditions yet.</div>
         )}
+
         <div className="space-y-2">
           {conditions.map((c, i) => (
             <div key={i} className="space-y-1.5 bg-cardalt rounded p-2 border border-slate-700/60">
-              <div className="flex gap-1.5">
-                <select
+              {/* Field picker + remove */}
+              <div className="flex gap-1.5 items-center">
+                <ColumnDropdown
                   value={c.field || ''}
-                  onChange={(e) => setCondition(i, { field: e.target.value })}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-200 min-w-0"
-                >
-                  <option value="">— field —</option>
-                  {cols.map((col) => (
-                    <option key={col} value={col}>{col}</option>
-                  ))}
-                </select>
-                <select
-                  value={c.op}
-                  onChange={(e) => setCondition(i, { op: e.target.value })}
-                  className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-200"
-                >
-                  {OPS.map((o) => (
-                    <option key={o} value={o}>{o.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
-                <button onClick={() => remove(i)} className="text-slate-500 hover:text-rose-400">
+                  options={cols}
+                  onChange={(field) => setCondition(i, { field })}
+                  placeholder="— field —"
+                  className="flex-1"
+                />
+                <button onClick={() => remove(i)} className="text-slate-500 hover:text-rose-400 shrink-0">
                   <X size={14} />
                 </button>
               </div>
+
+              {/* Operator */}
+              <select
+                value={c.op}
+                onChange={(e) => setCondition(i, { op: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-200"
+              >
+                {OPS.map((o) => (
+                  <option key={o} value={o}>{o.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+
+              {/* Value */}
               {!['is_empty', 'is_not_empty'].includes(c.op) && (
                 <input
                   placeholder="value"

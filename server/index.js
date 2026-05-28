@@ -26,6 +26,9 @@ if (fs.existsSync(rootEnv)) {
 }
 
 const app = express();
+// Don't advertise Express in the X-Powered-By header — it leaks framework
+// info that helps attackers fingerprint the stack.
+app.disable('x-powered-by');
 
 // CORS — only the local Vite dev server and same-origin requests.
 // The production setup proxies /api through Vite, so cross-origin requests

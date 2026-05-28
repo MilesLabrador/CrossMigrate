@@ -13,7 +13,7 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
     destination: uploadsDir,
-    filename: (_req, file, cb) => cb(null, `${randomUUID()}-${file.originalname}`),
+    filename: (_req, file, cb) => cb(null, `${randomUUID()}-${path.basename(file.originalname)}`),
   }),
   limits: { fileSize: 100 * 1024 * 1024 },
 });
@@ -23,10 +23,11 @@ const router = express.Router();
 router.post('/upload-csv', upload.single('file'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'no file' });
-    const delimiter = req.body.delimiter || '';
+    const delimiter = typeof req.body.delimiter === 'string' ? req.body.delimiter : '';
     const header = req.body.header !== 'false';
     const ALLOWED_ENCODINGS = new Set(['utf8', 'utf-8', 'utf16le', 'latin1', 'ascii']);
-    const requested = (req.body.encoding || 'utf8').toLowerCase();
+    const rawEncoding = typeof req.body.encoding === 'string' ? req.body.encoding : 'utf8';
+    const requested = rawEncoding.toLowerCase();
     const encoding = ALLOWED_ENCODINGS.has(requested) ? requested : 'utf8';
     const text = fs.readFileSync(req.file.path, encoding);
     const parsed = Papa.parse(text, {

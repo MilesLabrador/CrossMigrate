@@ -8,6 +8,9 @@ const router = express.Router();
 router.post('/run-pipeline', async (req, res) => {
   const { nodes = [], edges = [] } = req.body || {};
   res.setHeader('Content-Type', 'application/x-ndjson');
+  // Prevent browsers from MIME-sniffing the streamed payload as HTML,
+  // which would otherwise let user-controlled node output render as XSS.
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();

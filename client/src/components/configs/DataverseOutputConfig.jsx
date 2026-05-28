@@ -4,6 +4,7 @@ import {
   Search, ChevronDown, ChevronRight, Check, Loader2, LogIn,
   Download, Upload, AlertCircle, CheckCircle2,
 } from 'lucide-react';
+import ColumnDropdown from '../ColumnDropdown';
 import { distance } from 'fastest-levenshtein';
 import { fetchEntities, fetchEntityFields, importToDataverseSSE } from '../../lib/api';
 import { usePipelineStore, getUpstreamColumns } from '../../store/usePipelineStore';
@@ -400,19 +401,17 @@ export default function DataverseOutputConfig({ nodeId }) {
               <div key={i} className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
                 <div className="bg-slate-800 px-2 py-1 rounded text-xs text-slate-200 truncate">{m.source}</div>
                 <span className="text-slate-500">→</span>
-                <select
+                <ColumnDropdown
                   value={m.target || ''}
-                  onChange={(e) => setMapping(i, { target: e.target.value })}
-                  className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-200 min-w-0 hover:border-slate-500 focus:border-sky-500 outline-none"
-                >
-                  <option value="">—</option>
-                  {fields.map((f) => (
-                    <option key={f.logicalName} value={f.logicalName}>
-                      {f.displayName} ({f.logicalName})
-                      {f.requiredLevel === 'ApplicationRequired' ? ' *' : ''}
-                    </option>
-                  ))}
-                </select>
+                  options={fields.map((f) => ({
+                    value: f.logicalName,
+                    label: f.displayName + (f.requiredLevel === 'ApplicationRequired' ? ' *' : ''),
+                    sub: f.logicalName,
+                  }))}
+                  onChange={(target) => setMapping(i, { target })}
+                  placeholder="—"
+                  disabled={loadingFields}
+                />
               </div>
             ))}
           </div>

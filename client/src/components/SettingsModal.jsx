@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Loader2, AlertCircle, Trash2, ExternalLink, Copy, CheckCircle2, LogIn, User } from 'lucide-react';
-import { fetchConnections, fetchServerConfig, startConnectionSignIn, pollConnectionSignIn, deleteConnection, activateConnection } from '../lib/api';
+import { fetchConnections, fetchServerConfig, startConnectionSignIn, startInteractiveSignIn, pollConnectionSignIn, deleteConnection, activateConnection } from '../lib/api';
 
 // Dataverse org hostnames look like `org.crm.dynamics.com` / `.crm4.` etc.
 const ORG_HOST_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
@@ -23,7 +23,8 @@ export default function SettingsModal({ onClose }) {
 
   // Sign-in flow state. `prompt` collects the org URL when one isn't configured
   // server-side (or the user wants to use a different env).
-  const [signInStage, setSignInStage] = useState(null); // null | 'prompt' | 'loading' | 'code' | 'done' | 'error'
+  // Stages: null | 'prompt' | 'loading' | 'interactive' | 'code' | 'done' | 'error'
+  const [signInStage, setSignInStage] = useState(null);
   const [orgUrlInput, setOrgUrlInput] = useState('');
   const [orgUrlError, setOrgUrlError] = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -66,18 +67,62 @@ export default function SettingsModal({ onClose }) {
     setSignInStage('prompt');
   };
 
-  const onSubmitOrgUrl = async (e) => {
-    e?.preventDefault?.();
+  // Shared validation helper
+  const validateOrg = () => {
     const org = normalizeOrgUrl(orgUrlInput);
-    if (!org) {
-      setOrgUrlError('Enter your Dataverse environment URL.');
-      return;
-    }
+    if (!org) { setOrgUrlError('Enter your Dataverse environment URL.'); return null; }
     if (!ORG_HOST_RE.test(org) || !/\.dynamics\.com$/i.test(org)) {
       setOrgUrlError('Must be a Dataverse host like yourorg.crm.dynamics.com');
-      return;
+      return null;
     }
     setOrgUrlError(null);
+    return org;
+  };
+
+  // Shared polling starter — used by both flows after their own setup
+  const startPolling = () => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await pollConnectionSignIn();
+        if (s.status === 'authenticated') {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setSignInStage('done');
+          setTimeout(async () => { setSignInStage(null); await load(); }, 1200);
+        } else if (s.status === 'error') {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setError(s.error || 'Sign-in failed');
+          setSignInStage('error');
+        }
+      } catch { /* network hiccup — keep polling */ }
+    }, 2000);
+  };
+
+  // Primary: interactive browser sign-in (auth code + PKCE)
+  const onSubmitOrgUrl = async (e) => {
+    e?.preventDefault?.();
+    const org = validateOrg();
+    if (!org) return;
+    setSignInStage('loading');
+    try {
+      const { authUrl } = await startInteractiveSignIn(org, {
+        clientId: clientIdInput.trim(),
+        tenantId: tenantIdInput.trim(),
+      });
+      window.open(authUrl, '_blank', 'noopener,noreferrer');
+      setSignInStage('interactive');
+      startPolling();
+    } catch (e) {
+      setError(e.message);
+      setSignInStage('error');
+    }
+  };
+
+  // Fallback: device code flow
+  const onSubmitDeviceCode = async () => {
+    const org = validateOrg();
+    if (!org) return;
     setSignInStage('loading');
     try {
       const info = await startConnectionSignIn(org, {
@@ -86,26 +131,7 @@ export default function SettingsModal({ onClose }) {
       });
       setCodeInfo(info);
       setSignInStage('code');
-
-      pollRef.current = setInterval(async () => {
-        try {
-          const s = await pollConnectionSignIn();
-          if (s.status === 'authenticated') {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-            setSignInStage('done');
-            setTimeout(async () => {
-              setSignInStage(null);
-              await load();
-            }, 1200);
-          } else if (s.status === 'error') {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-            setError(s.error || 'Sign-in failed');
-            setSignInStage('error');
-          }
-        } catch { /* network hiccup — keep polling */ }
-      }, 2000);
+      startPolling();
     } catch (e) {
       setError(e.message);
       setSignInStage('error');
@@ -185,27 +211,26 @@ export default function SettingsModal({ onClose }) {
           {!loading && connections.map((conn) => (
             <div
               key={conn.id}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition group ${
+              onClick={() => onActivate(conn.id)}
+              title={conn.id === activeId ? 'Active connection' : 'Set as active'}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition group cursor-pointer ${
                 conn.id === activeId
                   ? 'border-emerald-700/60 bg-emerald-900/20'
-                  : 'border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/50'
+                  : 'border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60'
               }`}
             >
-              <button
-                onClick={() => onActivate(conn.id)}
-                title={conn.id === activeId ? 'Active connection' : 'Set as active'}
-                className="shrink-0"
-              >
+              {/* Radio indicator */}
+              <div className="shrink-0">
                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition ${
                   conn.id === activeId
                     ? 'border-emerald-400'
-                    : 'border-slate-600 hover:border-slate-400'
+                    : 'border-slate-600 group-hover:border-slate-400'
                 }`}>
                   {conn.id === activeId && (
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                   )}
                 </div>
-              </button>
+              </div>
 
               <User size={14} className={conn.id === activeId ? 'text-emerald-400' : 'text-slate-500'} />
 
@@ -218,7 +243,7 @@ export default function SettingsModal({ onClose }) {
               </div>
 
               <button
-                onClick={() => onDelete(conn.id)}
+                onClick={(e) => { e.stopPropagation(); onDelete(conn.id); }}
                 className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 shrink-0"
               >
                 <Trash2 size={12} />
@@ -295,20 +320,31 @@ export default function SettingsModal({ onClose }) {
                   {orgUrlError}
                 </div>
               )}
-              <div className="flex items-center justify-end gap-2 pt-1">
+              <div className="flex items-center justify-between gap-2 pt-1">
+                {/* Device code fallback — for environments where browser pop-ups are blocked */}
                 <button
                   type="button"
-                  onClick={cancelSignIn}
-                  className="text-xs text-slate-500 hover:text-slate-300 transition px-3 py-1.5"
+                  onClick={onSubmitDeviceCode}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition underline underline-offset-2"
                 >
-                  Cancel
+                  Use device code instead
                 </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition"
-                >
-                  Continue
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={cancelSignIn}
+                    className="text-xs text-slate-500 hover:text-slate-300 transition px-3 py-1.5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition"
+                  >
+                    <ExternalLink size={13} />
+                    Sign in with Browser
+                  </button>
+                </div>
               </div>
             </form>
           )}
@@ -319,6 +355,26 @@ export default function SettingsModal({ onClose }) {
               <div className="flex items-center gap-3 text-slate-400">
                 <Loader2 size={16} className="animate-spin shrink-0" />
                 <span className="text-sm">Requesting sign-in code…</span>
+              </div>
+            </div>
+          )}
+
+          {signInStage === 'interactive' && (
+            <div className="border border-sky-700/40 bg-sky-900/10 rounded-lg p-5 space-y-3">
+              <p className="text-sm text-slate-300 leading-relaxed">
+                A browser tab has opened for sign-in. Complete the sign-in there and this panel will update automatically.
+              </p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-500 text-xs">
+                  <Loader2 size={11} className="animate-spin shrink-0" />
+                  Waiting for browser sign-in…
+                </div>
+                <button
+                  onClick={cancelSignIn}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           )}
@@ -402,15 +458,23 @@ export default function SettingsModal({ onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-6 pb-5 pt-2 border-t border-slate-800 shrink-0">
+        <div className="flex items-center justify-end gap-2 px-6 pb-5 pt-2 border-t border-slate-800 shrink-0">
           {!signInStage && connections.length > 0 && (
-            <button
-              onClick={onStartSignIn}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition"
-            >
-              <LogIn size={13} />
-              Add Account
-            </button>
+            <>
+              <button
+                onClick={onStartSignIn}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-medium transition"
+              >
+                <LogIn size={13} />
+                Add Account
+              </button>
+              <button
+                onClick={onClose}
+                className="px-5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition"
+              >
+                OK
+              </button>
+            </>
           )}
         </div>
       </div>

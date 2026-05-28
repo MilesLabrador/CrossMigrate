@@ -1,7 +1,9 @@
 import * as msal from '@azure/msal-node';
 import { InteractionRequiredAuthError } from '@azure/msal-node';
-import fs   from 'node:fs';
-import path from 'node:path';
+import fs     from 'node:fs';
+import path   from 'node:path';
+import http   from 'node:http';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
@@ -177,6 +179,125 @@ export async function startDeviceCodeFlow(orgUrl, { clientId, tenantId } = {}) {
   return deviceCodeReady;
 }
 
+// ── Interactive browser flow (auth code + PKCE) ─────────────────────────────
+// Opens a real browser window via a localhost redirect URI, just like
+// XrmToolBox and other desktop tools that work with Conditional Access.
+// Returns { authUrl } immediately; the sign-in completes asynchronously when
+// the user finishes in the browser tab. Poll /sign-in/status as usual.
+export async function startInteractiveFlow(orgUrl, { clientId, tenantId } = {}) {
+  const org = orgUrl || process.env.ORG_URL;
+  if (!org) throw new Error('No org URL provided and ORG_URL is not set in .env');
+  assertOrgHost(org);
+
+  const cid    = effectiveClientId(clientId);
+  const tid    = effectiveTenantId(tenantId);
+  const scopes = [`https://${org}/user_impersonation`];
+
+  // PKCE — generate verifier + S256 challenge
+  const verifier  = crypto.randomBytes(32).toString('base64url');
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+  const state     = crypto.randomBytes(16).toString('hex');
+
+  // Spin up a one-shot HTTP server on an OS-assigned port
+  const server = http.createServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port        = server.address().port;
+  // Azure CLI public client has `http://localhost` registered (no path).
+  // Azure AD allows any port under RFC 8252 loopback rules, but the path
+  // must match exactly — so we use the bare root, not /callback.
+  const redirectUri = `http://localhost:${port}`;
+
+  const { pca } = getPca(cid, tid);
+  const authUrl = await pca.getAuthCodeUrl({
+    scopes,
+    redirectUri,
+    codeChallenge:       challenge,
+    codeChallengeMethod: 'S256',
+    state,
+    prompt: 'select_account',
+  });
+
+  authState = { status: 'pending' };
+
+  // Auto-expire after 5 minutes
+  const TIMEOUT_MS = 5 * 60 * 1000;
+  const timeout = setTimeout(() => {
+    server.close();
+    if (authState.status === 'pending') {
+      authState = { status: 'error', error: 'Sign-in timed out. Please try again.' };
+    }
+  }, TIMEOUT_MS);
+
+  const escHtml = (s) =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;');
+
+  const html = {
+    ok: `<!doctype html><html><body style="font-family:sans-serif;text-align:center;padding:4rem;background:#0f172a;color:#e2e8f0">
+<h2 style="color:#34d399">Signed in successfully!</h2>
+<p style="color:#94a3b8">You can close this tab and return to CrossMigrate.</p>
+<script>setTimeout(()=>window.close(),2000)</script></body></html>`,
+    fail: (msg) => `<!doctype html><html><body style="font-family:sans-serif;text-align:center;padding:4rem;background:#0f172a;color:#e2e8f0">
+<h2 style="color:#f87171">Sign-in failed</h2>
+<p style="color:#94a3b8">${escHtml(msg) || 'An error occurred.'}</p>
+<p style="color:#64748b">You can close this tab.</p></body></html>`,
+  };
+
+  server.on('request', async (req, res) => {
+    // Ignore favicon/other stray requests; only handle the root redirect
+    const url = new URL(req.url, `http://localhost:${port}`);
+    if (url.pathname !== '/') { res.writeHead(204); res.end(); return; }
+
+    clearTimeout(timeout);
+    server.close();
+
+    const code          = url.searchParams.get('code');
+    const returnedState = url.searchParams.get('state');
+    const errorParam    = url.searchParams.get('error');
+    const errorDesc     = url.searchParams.get('error_description');
+
+    if (errorParam || !code) {
+      authState = { status: 'error', error: errorDesc || errorParam || 'Sign-in cancelled.' };
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html.fail(authState.error));
+      return;
+    }
+
+    if (returnedState !== state) {
+      authState = { status: 'error', error: 'State mismatch — possible CSRF. Please try again.' };
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html.fail('State parameter mismatch.'));
+      return;
+    }
+
+    try {
+      const result = await pca.acquireTokenByCode({
+        code,
+        scopes,
+        redirectUri,
+        codeVerifier: verifier,
+      });
+      if (result) {
+        setCurrent(cid, tid, result.account);
+        console.log(`[msal] browser sign-in as ${result.account.username} for ${org} (client ${cid})`);
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html.ok);
+    } catch (err) {
+      authState = { status: 'error', error: err.message };
+      console.error('[msal] interactive token exchange failed:', err.message);
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html.fail(err.message));
+    }
+  });
+
+  return { authUrl };
+}
+
 // ── Silent token acquisition ────────────────────────────────────────────────
 // Accepts optional (clientId, tenantId) so per-connection sessions can be
 // addressed. Falls back to the current global session when not provided.
@@ -225,6 +346,37 @@ export async function getUserToken(orgUrl, { clientId, tenantId } = {}) {
     }
     return null;
   }
+}
+
+// ── Switch active account ───────────────────────────────────────────────────
+// Activating a different connection in the UI must point the global
+// (currentKey, accountByKey) pair at *that* connection's identity, otherwise
+// silent token requests keep using whichever account was most recently signed
+// in. Two connections that share the same (clientId, tenantId) collide on the
+// same PCA cache, so we have to look the right account up by username inside
+// that cache — not just trust the last-set value.
+export async function activateAccount({ clientId, tenantId, username }) {
+  if (!username) throw new Error('username is required to activate account');
+  const cid = effectiveClientId(clientId);
+  const tid = effectiveTenantId(tenantId);
+  const key = pcaKey(cid, tid);
+
+  const { pca, ready } = getPca(cid, tid);
+  await ready;
+
+  const accounts = await pca.getTokenCache().getAllAccounts();
+  const match = accounts.find(
+    (a) => (a.username || '').toLowerCase() === username.toLowerCase(),
+  );
+  if (!match) {
+    // No cached account → caller needs to sign this connection in again.
+    throw new Error(`sign-in-required:${username}`);
+  }
+
+  currentKey = key;
+  accountByKey.set(key, match);
+  authState = { status: 'authenticated' };
+  return { username: match.username, name: match.name };
 }
 
 // ── Reset (e.g. CLIENT_ID / TENANT_ID env changed at runtime) ───────────────

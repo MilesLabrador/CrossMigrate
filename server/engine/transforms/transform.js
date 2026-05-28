@@ -20,6 +20,8 @@ function applyOne(value, type, opts = {}) {
       const d = inFmt ? dayjs(s, inFmt) : dayjs(s);
       return d.isValid() ? d.format(outFmt) : s;
     }
+    case 'set':
+      return opts.value ?? '';
     case 'replace': {
       const find = opts.find ?? '';
       const replace = opts.replace ?? '';

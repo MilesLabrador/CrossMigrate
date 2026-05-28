@@ -82,6 +82,14 @@ export default function ManualDataNode({ id, selected }) {
     setColumns([...columns, name]);
   };
 
+  const removeCol = (idx) => {
+    if (columns.length <= 1) return;
+    const cols = columns.filter((_, i) => i !== idx);
+    const removed = columns[idx];
+    const newRows = rows.map(({ [removed]: _, ...rest }) => rest);
+    updateNodeData(id, { columns: cols, rows: newRows });
+  };
+
   return (
     <NodeShell id={id} selected={selected} category="source" icon={Pencil} typeLabel="Manual">
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
@@ -91,11 +99,22 @@ export default function ManualDataNode({ id, selected }) {
               <tr>
                 {columns.map((c, i) => (
                   <th key={i} className="px-1 pb-1">
-                    <ColHeader
-                      value={c}
-                      allColumns={columns}
-                      onCommit={(newName) => renameColumn(i, newName)}
-                    />
+                    <div className="flex items-center gap-0.5">
+                      <ColHeader
+                        value={c}
+                        allColumns={columns}
+                        onCommit={(newName) => renameColumn(i, newName)}
+                      />
+                      {columns.length > 1 && (
+                        <button
+                          onClick={() => removeCol(i)}
+                          className="text-slate-600 hover:text-rose-400"
+                          title="Remove column"
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
                   </th>
                 ))}
                 <th>

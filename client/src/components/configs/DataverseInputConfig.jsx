@@ -62,6 +62,7 @@ export default function DataverseInputConfig({ nodeId }) {
 
   const [fields, setFields]           = useState([]);
   const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [fieldSearch, setFieldSearch] = useState('');
   const [selectedFields, setSelectedFields] = useState(
     cfg.select ? cfg.select.split(',').map((s) => s.trim()).filter(Boolean) : []
   );
@@ -304,29 +305,64 @@ export default function DataverseInputConfig({ nodeId }) {
                 <Loader2 size={11} className="animate-spin" /> Loading fields…
               </div>
             ) : fields.length > 0 ? (
-              <div className="max-h-48 overflow-y-auto border border-slate-700 rounded divide-y divide-slate-800">
-                {fields.map((f) => {
-                  const on = selectedFields.includes(f.logicalName);
-                  return (
-                    <label
-                      key={f.logicalName}
-                      className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-800 cursor-pointer"
-                    >
+              (() => {
+                const q = fieldSearch.toLowerCase();
+                const visible = q
+                  ? fields.filter(
+                      (f) =>
+                        f.displayName.toLowerCase().includes(q) ||
+                        f.logicalName.toLowerCase().includes(q),
+                    )
+                  : fields;
+                return (
+                  <>
+                    <div className="flex items-center gap-2 px-2 py-1.5 mb-1.5 rounded bg-slate-800 border border-slate-700">
+                      <Search size={11} className="text-slate-400 shrink-0" />
                       <input
-                        type="checkbox"
-                        checked={on}
-                        onChange={() => toggleField(f.logicalName)}
-                        className="accent-emerald-500"
+                        value={fieldSearch}
+                        onChange={(e) => setFieldSearch(e.target.value)}
+                        placeholder="Search columns…"
+                        className="bg-transparent text-slate-200 text-xs w-full outline-none placeholder-slate-600"
                       />
-                      <span className="flex-1">
-                        <span className="text-slate-200">{f.displayName}</span>
-                        <span className="text-slate-600 ml-1.5 text-[10px]">{f.logicalName}</span>
-                      </span>
-                      <span className="text-[10px] text-slate-600 shrink-0">{f.attributeType}</span>
-                    </label>
-                  );
-                })}
-              </div>
+                    </div>
+                    <div className="text-[10px] text-slate-600 mb-1">
+                      {visible.length} of {fields.length} columns
+                      {selectedFields.length > 0 && (
+                        <span className="ml-2 text-emerald-500/70">{selectedFields.length} selected</span>
+                      )}
+                    </div>
+                    <div className="max-h-48 overflow-y-auto border border-slate-700 rounded divide-y divide-slate-800">
+                      {visible.length === 0 ? (
+                        <div className="px-3 py-2 text-slate-500 text-[11px] italic">
+                          No columns match &ldquo;{fieldSearch}&rdquo;.
+                        </div>
+                      ) : (
+                        visible.map((f) => {
+                          const on = selectedFields.includes(f.logicalName);
+                          return (
+                            <label
+                              key={f.logicalName}
+                              className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-800 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                onChange={() => toggleField(f.logicalName)}
+                                className="accent-emerald-500"
+                              />
+                              <span className="flex-1">
+                                <span className="text-slate-200">{f.displayName}</span>
+                                <span className="text-slate-600 ml-1.5 text-[10px]">{f.logicalName}</span>
+                              </span>
+                              <span className="text-[10px] text-slate-600 shrink-0">{f.attributeType}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                );
+              })()
             ) : (
               <div className="text-slate-500 py-1">No fields found</div>
             )}

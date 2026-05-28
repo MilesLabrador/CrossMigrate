@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import CellPopup from './CellPopup';
 import { usePipelineStore } from '../store/usePipelineStore';
 import XLSXInputConfig from './configs/XLSXInputConfig';
 import CSVInputConfig from './configs/CSVInputConfig';
@@ -39,6 +40,8 @@ const REGISTRY = {
 
 export default function ConfigPanel() {
   const { configPanelOpen, selectedNodeId, nodes, closeConfigPanel, nodeStatus } = usePipelineStore();
+  const [popup, setPopup] = useState(null);
+
   if (!configPanelOpen || !selectedNodeId) return null;
   const node = nodes.find((n) => n.id === selectedNodeId);
   if (!node) return null;
@@ -46,6 +49,13 @@ export default function ConfigPanel() {
   if (!entry) return null;
   const { Comp, title } = entry;
   const sample = nodeStatus[selectedNodeId]?.sample;
+
+  const openPopup = (e, col, value) => {
+    e.stopPropagation();
+    const v = String(value ?? '');
+    if (popup?.col === col && popup?.value === v) { setPopup(null); return; }
+    setPopup({ col, value: v, x: e.clientX, y: e.clientY });
+  };
 
   return (
     <aside className="w-[400px] shrink-0 bg-card border-l border-slate-800 overflow-y-auto animate-slide-in-right">
@@ -84,11 +94,20 @@ export default function ConfigPanel() {
               <tbody>
                 {sample.map((r, i) => (
                   <tr key={i} className="odd:bg-slate-900/40">
-                    {Object.keys(sample[0]).map((c) => (
-                      <td key={c} className="px-2 py-1 text-slate-200 max-w-[120px] truncate">
-                        {String(r[c] ?? '')}
-                      </td>
-                    ))}
+                    {Object.keys(sample[0]).map((c) => {
+                      const cell = String(r[c] ?? '');
+                      const long = cell.length > 20;
+                      return (
+                        <td
+                          key={c}
+                          className={`px-2 py-1 text-slate-200 max-w-[120px] truncate ${long ? 'cursor-pointer hover:text-sky-300' : ''}`}
+                          title={long ? 'Click to preview full value' : cell}
+                          onClick={long ? (e) => openPopup(e, c, cell) : undefined}
+                        >
+                          {cell}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -96,6 +115,7 @@ export default function ConfigPanel() {
           </div>
         </div>
       )}
+      {popup && <CellPopup {...popup} onClose={() => setPopup(null)} />}
     </aside>
   );
 }

@@ -25,8 +25,10 @@ export default function FilterNode({ id, selected }) {
           {conditions.map((c, i) => (
             <div key={i} className="text-slate-300">
               <span className="text-sky-400">{c.field || '—'}</span>{' '}
-              <span className="text-slate-500">{c.op}</span>{' '}
-              <span className="text-emerald-400">"{c.value ?? ''}"</span>
+              <span className="text-slate-500">{c.op?.replace(/_/g, ' ')}</span>{' '}
+              {!['is_empty', 'is_not_empty'].includes(c.op) && (
+                <span className="text-emerald-400">"{c.value ?? ''}"</span>
+              )}
               {i < conditions.length - 1 && (
                 <span className="text-slate-500 ml-1 font-bold">{cfg.combinator || 'AND'}</span>
               )}

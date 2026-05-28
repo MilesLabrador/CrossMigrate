@@ -165,6 +165,19 @@ export async function startConnectionSignIn(orgUrl = '', { clientId = '', tenant
   return r.json();
 }
 
+export async function startInteractiveSignIn(orgUrl = '', { clientId = '', tenantId = '' } = {}) {
+  const r = await fetch('/api/connections/interactive-sign-in', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orgUrl, clientId, tenantId }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `interactive-sign-in: ${r.status}`);
+  }
+  return r.json(); // { authUrl }
+}
+
 export async function pollConnectionSignIn() {
   const r = await fetch('/api/connections/sign-in/status');
   if (!r.ok) throw new Error(`sign-in status: ${r.status}`);

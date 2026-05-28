@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nanoid } from 'nanoid';
-import { startDeviceCodeFlow, getAuthState, getUserToken, resetPca, logout } from '../auth/msalAuth.js';
+import { startDeviceCodeFlow, startInteractiveFlow, getAuthState, getUserToken, resetPca, logout, activateAccount } from '../auth/msalAuth.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,8 +22,29 @@ function writeStore(store) {
   fs.writeFileSync(CONN_PATH, JSON.stringify(store, null, 2) + '\n');
 }
 
+// Make sure the auth module's "current account" matches the persisted active
+// connection on cold start. Without this, a server restart can leave the auth
+// module pointing at whatever account loaded first from the MSAL cache, even
+// if that's not the connection the user last activated.
+let _bootSynced = false;
+async function syncActiveAccountOnce() {
+  if (_bootSynced) return;
+  _bootSynced = true;
+  const store = readStore();
+  const active = store.connections.find((c) => c.id === store.activeId);
+  if (!active?.username) return;
+  try {
+    await activateAccount({
+      clientId: active.clientId,
+      tenantId: active.tenantId,
+      username: active.username,
+    });
+  } catch { /* cached account missing — UI will prompt re-sign-in */ }
+}
+
 // GET /api/connections
-router.get('/connections', (_req, res) => {
+router.get('/connections', async (_req, res) => {
+  await syncActiveAccountOnce();
   const store = readStore();
   res.json(store);
 });
@@ -34,13 +55,15 @@ router.get('/connections', (_req, res) => {
 let pending = { orgUrl: '', clientId: '', tenantId: '' };
 
 // POST /api/connections/sign-in — start device code flow to create a connection
+const asString = (v) => (typeof v === 'string' ? v.trim() : '');
+
 router.post('/connections/sign-in', async (req, res) => {
   const { orgUrl, clientId, tenantId } = req.body || {};
   try {
     pending = {
-      orgUrl:   (orgUrl   || '').trim(),
-      clientId: (clientId || '').trim(),
-      tenantId: (tenantId || '').trim(),
+      orgUrl:   asString(orgUrl),
+      clientId: asString(clientId),
+      tenantId: asString(tenantId),
     };
     const info = await startDeviceCodeFlow(pending.orgUrl, {
       clientId: pending.clientId,
@@ -54,6 +77,26 @@ router.post('/connections/sign-in', async (req, res) => {
     });
   } catch (err) {
     console.error('[connections/sign-in]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/connections/interactive-sign-in — start auth-code + PKCE browser flow
+router.post('/connections/interactive-sign-in', async (req, res) => {
+  const { orgUrl, clientId, tenantId } = req.body || {};
+  try {
+    pending = {
+      orgUrl:   asString(orgUrl),
+      clientId: asString(clientId),
+      tenantId: asString(tenantId),
+    };
+    const { authUrl } = await startInteractiveFlow(pending.orgUrl, {
+      clientId: pending.clientId,
+      tenantId: pending.tenantId,
+    });
+    res.json({ authUrl });
+  } catch (err) {
+    console.error('[connections/interactive-sign-in]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -97,10 +140,26 @@ router.get('/connections/sign-in/status', async (_req, res) => {
 });
 
 // POST /api/connections/:id/activate
-router.post('/connections/:id/activate', (req, res) => {
+router.post('/connections/:id/activate', async (req, res) => {
   const store = readStore();
   const conn = store.connections.find((c) => c.id === req.params.id);
   if (!conn) return res.status(404).json({ error: 'Connection not found' });
+
+  // Point the auth module at the account this connection was signed in as.
+  // Without this, the global "current" account stays whatever it was, and
+  // Dataverse requests use the wrong identity — producing spurious "user is
+  // not a member of the organization" errors when the user switches between
+  // connections that share an app registration.
+  try {
+    await activateAccount({
+      clientId: conn.clientId,
+      tenantId: conn.tenantId,
+      username: conn.username,
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
   store.activeId = conn.id;
   writeStore(store);
   res.json({ ok: true, activeId: conn.id });
