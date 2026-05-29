@@ -9,6 +9,10 @@ connections.json
 dist
 server/uploads/*
 !server/uploads/.gitkeep
+# Root uploads dir is where the XLSX/CSV upload routes write user files.
+# Never commit uploaded data.
+uploads/*
+!uploads/.gitkeep
 server/mappings/*.json
 .vite
 /.claude

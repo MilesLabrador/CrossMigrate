@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DatabaseZap, RefreshCw, AlertCircle, ShieldAlert, UserPlus } from 'lucide-react';
 import NodeShell from '../components/NodeShell';
 import { usePipelineStore } from '../store/usePipelineStore';
-import { fetchDataverseRows, isAuthError, openConnectionsModal } from '../lib/api';
+import { fetchDataverseRows, fetchDataverseView, isAuthError, openConnectionsModal } from '../lib/api';
 
 export default function DataverseInputNode({ id, selected }) {
   const { nodes, updateNodeData } = usePipelineStore();
@@ -13,7 +13,8 @@ export default function DataverseInputNode({ id, selected }) {
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(null);
 
-  const canFetch = !!cfg.entity;
+  const isViewMode = cfg.mode === 'view';
+  const canFetch = isViewMode ? !!(cfg.entity && cfg.fetchXml) : !!cfg.entity;
 
   const handleFetch = async (e) => {
     e.stopPropagation();
@@ -21,13 +22,21 @@ export default function DataverseInputNode({ id, selected }) {
     setFetching(true);
     setError(null);
     try {
-      const result = await fetchDataverseRows({
-        entity:  cfg.entity,
-        select:  cfg.select  || '',
-        filter:  cfg.filter  || '',
-        top:     cfg.top     || 5000,
-        orgUrl:  cfg.orgUrl  || '',
-      });
+      const result = isViewMode
+        ? await fetchDataverseView({
+            entityCollection: cfg.entity,
+            savedQueryId:     cfg.viewId,
+            orgUrl:           cfg.orgUrl || '',
+            top:              cfg.top    || 5000,
+            viewColumns:      cfg.viewColumns || [],
+          })
+        : await fetchDataverseRows({
+            entity:  cfg.entity,
+            select:  cfg.select  || '',
+            filter:  cfg.filter  || '',
+            top:     cfg.top     || 5000,
+            orgUrl:  cfg.orgUrl  || '',
+          });
       updateNodeData(id, {
         rows: result.rows,
         columns: result.columns,
@@ -52,7 +61,7 @@ export default function DataverseInputNode({ id, selected }) {
     >
       {!cfg.entity ? (
         <div className="text-slate-400 text-[11px] text-center py-3">
-          Click node to configure entity
+          Click node to configure {isViewMode ? 'table & view' : 'entity'}
         </div>
       ) : (
         <div className="space-y-2">
@@ -66,6 +75,12 @@ export default function DataverseInputNode({ id, selected }) {
               </span>
             )}
           </div>
+
+          {isViewMode && (
+            cfg.viewName
+              ? <div className="text-[10px] text-sky-300 truncate">View: {cfg.viewName}</div>
+              : <div className="text-[10px] text-slate-500 italic">No view selected</div>
+          )}
 
           {columns.length > 0 && (
             <div className="text-[10px] text-slate-500 truncate">
@@ -115,7 +130,7 @@ export default function DataverseInputNode({ id, selected }) {
           ) : (
             <button
               onClick={handleFetch}
-              disabled={fetching}
+              disabled={fetching || !canFetch}
               className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded bg-emerald-700/40 hover:bg-emerald-700/60 text-emerald-300 text-[11px] font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw size={11} className={fetching ? 'animate-spin' : ''} />

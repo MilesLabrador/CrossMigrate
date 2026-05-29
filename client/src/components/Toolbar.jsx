@@ -4,7 +4,17 @@ import { usePipelineStore } from '../store/usePipelineStore';
 import { runPipelineStream, fetchDataverseRows, fetchDataverseView, isAuthError } from '../lib/api';
 import SettingsModal from './SettingsModal';
 
-const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'dataverseView', 'sqlInput']);
+const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'sqlInput']);
+
+// ── Dataverse source helpers ──────────────────────────────────────────────────
+// The unified `dataverseInput` node fetches by columns (OData) or, when
+// mode: 'view', by a saved Power Platform view (FetchXML).
+const isDvNode     = (n) => n.type === 'dataverseInput';
+const isDvViewMode = (n) => n.data?.config?.mode === 'view';
+const dvIsConfigured = (n) => {
+  const c = n.data?.config || {};
+  return isDvViewMode(n) ? !!(c.entity && c.fetchXml) : !!c.entity;
+};
 
 export default function Toolbar() {
   const {
@@ -125,11 +135,7 @@ export default function Toolbar() {
     resetNodeStatuses();
 
     // ── Auto-fetch unconfigured check ─────────────────────────────────────────
-    const unconfigured = nodes.filter(
-      (n) =>
-        (n.type === 'dataverseInput' && !n.data?.config?.entity) ||
-        (n.type === 'dataverseView'  && (!n.data?.config?.entity || !n.data?.config?.fetchXml))
-    );
+    const unconfigured = nodes.filter((n) => isDvNode(n) && !dvIsConfigured(n));
     if (unconfigured.length) {
       showBanner('warn', `${unconfigured.map((n) => n.data?.name).join(', ')} has no entity/view configured — open its config panel first`);
       setRunning(false);
@@ -138,9 +144,7 @@ export default function Toolbar() {
 
     // ── Auto-fetch unfetched Dataverse source nodes ───────────────────────────
     const unfetched = nodes.filter(
-      (n) =>
-        (n.type === 'dataverseInput' && n.data?.config?.entity   && !(n.data?.rows?.length)) ||
-        (n.type === 'dataverseView'  && n.data?.config?.fetchXml && !(n.data?.rows?.length))
+      (n) => isDvNode(n) && dvIsConfigured(n) && !(n.data?.rows?.length)
     );
     if (unfetched.length) {
       showBanner('ok', `Auto-fetching ${unfetched.length} Dataverse source${unfetched.length > 1 ? 's' : ''}…`, 0);
@@ -148,11 +152,12 @@ export default function Toolbar() {
         try {
           const cfg = n.data.config;
           let result;
-          if (n.type === 'dataverseView') {
+          if (isDvViewMode(n)) {
             result = await fetchDataverseView({
               entityCollection: cfg.entity,
               savedQueryId:     cfg.viewId,
               orgUrl:           cfg.orgUrl || '',
+              top:              cfg.top    || 5000,
               viewColumns:      cfg.viewColumns || [],
             });
           } else {

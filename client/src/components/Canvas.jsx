@@ -11,7 +11,6 @@ import {
 import { usePipelineStore } from '../store/usePipelineStore';
 
 import DataverseInputNode   from '../nodes/DataverseInputNode';
-import DataverseViewNode    from '../nodes/DataverseViewNode';
 import PreviewColumnsNode  from '../nodes/PreviewColumnsNode';
 import RandomSampleNode   from '../nodes/RandomSampleNode';
 import XLSXInputNode       from '../nodes/XLSXInputNode';
@@ -31,7 +30,6 @@ import SQLOutputNode       from '../nodes/SQLOutputNode';
 
 const nodeTypes = {
   dataverseInput:  DataverseInputNode,
-  dataverseView:   DataverseViewNode,
   previewColumns:  PreviewColumnsNode,
   randomSample:    RandomSampleNode,
   xlsxInput:       XLSXInputNode,
@@ -160,7 +158,7 @@ function CanvasInner() {
         <MiniMap
           position="bottom-right"
           nodeColor={(n) => {
-            if (['csvInput', 'xlsxInput', 'manualData', 'dataverseInput', 'dataverseView'].includes(n.type)) return '#22c55e';
+            if (['csvInput', 'xlsxInput', 'manualData', 'dataverseInput'].includes(n.type)) return '#22c55e';
             if (['dataverseOutput', 'csvExport'].includes(n.type)) return '#f43f5e';
             return '#64748b';
           }}

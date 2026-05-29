@@ -198,14 +198,43 @@ export async function startInteractiveFlow(orgUrl, { clientId, tenantId } = {}) 
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
   const state     = crypto.randomBytes(16).toString('hex');
 
-  // Spin up a one-shot HTTP server on an OS-assigned port
+  // Spin up a one-shot HTTP server on an OS-assigned port. We listen on BOTH
+  // loopback stacks (IPv4 127.0.0.1 and IPv6 ::1) on the same port: on Windows
+  // `localhost` usually resolves to ::1 first, so an IPv4-only listener gets
+  // ERR_CONNECTION_REFUSED when the browser comes back from Microsoft. Azure AD
+  // only accepts `http://localhost` as the redirect (a bare `::1` literal is
+  // not a supported redirect URI), so the URL string must stay `localhost` —
+  // we just make sure the server answers on whichever stack the OS picks.
   const server = http.createServer();
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const port        = server.address().port;
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const port = server.address().port;
+
+  // Best-effort second listener on the IPv6 loopback at the same port. If the
+  // host has no IPv6 stack this throws and we silently keep IPv4 only.
+  let server6 = null;
+  try {
+    const s6 = http.createServer();
+    await new Promise((resolve, reject) => {
+      s6.once('error', reject);
+      s6.listen(port, '::1', resolve);
+    });
+    server6 = s6;
+  } catch {
+    server6 = null;
+  }
+
   // Azure CLI public client has `http://localhost` registered (no path).
   // Azure AD allows any port under RFC 8252 loopback rules, but the path
   // must match exactly — so we use the bare root, not /callback.
   const redirectUri = `http://localhost:${port}`;
+
+  const closeServers = () => {
+    try { server.close(); } catch { /* ignore */ }
+    try { server6?.close(); } catch { /* ignore */ }
+  };
 
   const { pca } = getPca(cid, tid);
   const authUrl = await pca.getAuthCodeUrl({
@@ -222,55 +251,70 @@ export async function startInteractiveFlow(orgUrl, { clientId, tenantId } = {}) 
   // Auto-expire after 5 minutes
   const TIMEOUT_MS = 5 * 60 * 1000;
   const timeout = setTimeout(() => {
-    server.close();
+    closeServers();
     if (authState.status === 'pending') {
       authState = { status: 'error', error: 'Sign-in timed out. Please try again.' };
     }
   }, TIMEOUT_MS);
 
-  const escHtml = (s) =>
-    String(s ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;');
+  // Where to send the browser once Microsoft redirects back. The ephemeral
+  // loopback server only lives for a moment, so we 302 the tab onto the running
+  // app instead of serving a page on a port that's about to die — otherwise a
+  // reload/restore of the callback tab hits a closed port (ERR_CONNECTION_REFUSED).
+  const appUrl = (process.env.APP_URL
+    || (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',')[0]
+    || 'http://localhost:5173').trim();
 
-  const html = {
-    ok: `<!doctype html><html><body style="font-family:sans-serif;text-align:center;padding:4rem;background:#0f172a;color:#e2e8f0">
-<h2 style="color:#34d399">Signed in successfully!</h2>
-<p style="color:#94a3b8">You can close this tab and return to CrossMigrate.</p>
-<script>setTimeout(()=>window.close(),2000)</script></body></html>`,
-    fail: (msg) => `<!doctype html><html><body style="font-family:sans-serif;text-align:center;padding:4rem;background:#0f172a;color:#e2e8f0">
-<h2 style="color:#f87171">Sign-in failed</h2>
-<p style="color:#94a3b8">${escHtml(msg) || 'An error occurred.'}</p>
-<p style="color:#64748b">You can close this tab.</p></body></html>`,
+  // Guard so a duplicate or late hit (favicon, tab restore) after we've already
+  // handled the code doesn't try to process again or write to a closed socket.
+  let done = false;
+
+  // Close the listeners a moment after responding. The grace period lets the
+  // browser finish the 302 navigation before the port goes away.
+  const finish = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(timeout);
+    setTimeout(closeServers, 1500);
   };
 
-  server.on('request', async (req, res) => {
+  const redirectToApp = (res, params = {}) => {
+    const dest = new URL(appUrl);
+    for (const [k, v] of Object.entries(params)) {
+      if (v != null) dest.searchParams.set(k, v);
+    }
+    res.writeHead(302, { Location: dest.toString() });
+    res.end();
+  };
+
+  const handleRedirect = async (req, res) => {
     // Ignore favicon/other stray requests; only handle the root redirect
     const url = new URL(req.url, `http://localhost:${port}`);
     if (url.pathname !== '/') { res.writeHead(204); res.end(); return; }
 
-    clearTimeout(timeout);
-    server.close();
+    // Already handled — just bounce any straggler request to the app.
+    if (done) { redirectToApp(res); return; }
 
     const code          = url.searchParams.get('code');
     const returnedState = url.searchParams.get('state');
     const errorParam    = url.searchParams.get('error');
     const errorDesc     = url.searchParams.get('error_description');
 
+    // A request with no auth params (e.g. tab restore) shouldn't be treated as
+    // a cancellation — bounce it to the app without touching auth state.
+    if (!code && !errorParam) { redirectToApp(res); return; }
+
+    finish();
+
     if (errorParam || !code) {
       authState = { status: 'error', error: errorDesc || errorParam || 'Sign-in cancelled.' };
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(html.fail(authState.error));
+      redirectToApp(res, { authError: authState.error });
       return;
     }
 
     if (returnedState !== state) {
       authState = { status: 'error', error: 'State mismatch — possible CSRF. Please try again.' };
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(html.fail('State parameter mismatch.'));
+      redirectToApp(res, { authError: 'State parameter mismatch.' });
       return;
     }
 
@@ -285,15 +329,16 @@ export async function startInteractiveFlow(orgUrl, { clientId, tenantId } = {}) 
         setCurrent(cid, tid, result.account);
         console.log(`[msal] browser sign-in as ${result.account.username} for ${org} (client ${cid})`);
       }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(html.ok);
+      redirectToApp(res, { signedIn: '1' });
     } catch (err) {
       authState = { status: 'error', error: err.message };
       console.error('[msal] interactive token exchange failed:', err.message);
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(html.fail(err.message));
+      redirectToApp(res, { authError: err.message });
     }
-  });
+  };
+
+  server.on('request', handleRedirect);
+  server6?.on('request', handleRedirect);
 
   return { authUrl };
 }

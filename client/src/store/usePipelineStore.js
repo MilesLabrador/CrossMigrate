@@ -7,8 +7,10 @@ const ENV_KEY = 'crossmigrate:environments';
 const STORAGE_KEY = 'crossmigrate:pipeline';
 
 export const NODE_DEFAULTS = {
-  dataverseInput: { config: { orgUrl: '', entity: '', select: '', filter: '', top: 5000 }, rows: [], columns: [] },
-  dataverseView:  { config: { orgUrl: '', entity: '', entityLogicalName: '', entityDisplayName: '', viewId: '', viewName: '', fetchXml: '', viewColumns: [] }, rows: [], columns: [] },
+  // Unified Dataverse source: `mode` switches between an OData column query and
+  // a saved Power Platform view (FetchXML). Carries fields for both so toggling
+  // mode in the config panel doesn't lose the other side's selection.
+  dataverseInput: { config: { mode: 'columns', orgUrl: '', entity: '', entityLogicalName: '', entityDisplayName: '', select: '', filter: '', top: 5000, viewId: '', viewName: '', fetchXml: '', viewColumns: [] }, rows: [], columns: [] },
   xlsxInput: { config: { header: true }, rows: [], columns: [] },
   csvInput: { config: {}, rows: [], columns: [] },
   manualData: {
@@ -183,20 +185,39 @@ export const usePipelineStore = create((set, get) => ({
     if (!raw) return false;
     try {
       const { projectName, nodes, edges } = JSON.parse(raw);
-      set({ projectName, nodes: nodes || [], edges: edges || [], nodeStatus: {} });
+      set({ projectName, nodes: migrateNodes(nodes || []), edges: edges || [], nodeStatus: {} });
       return true;
     } catch {
       return false;
     }
   },
   loadFromObject: ({ projectName, nodes, edges }) => {
-    set({ projectName: projectName || 'Untitled pipeline', nodes: nodes || [], edges: edges || [], nodeStatus: {}, selectedNodeId: null, configPanelOpen: false });
+    set({ projectName: projectName || 'Untitled pipeline', nodes: migrateNodes(nodes || []), edges: edges || [], nodeStatus: {}, selectedNodeId: null, configPanelOpen: false });
   },
   serialize: () => {
     const { projectName, nodes, edges } = get();
     return { projectName, nodes, edges };
   },
 }));
+
+// ── One-time schema migration ─────────────────────────────────────────────────
+// The standalone `dataverseView` node was folded into `dataverseInput` with
+// `mode: 'view'`. Rewrite any legacy nodes on load so old saved/imported
+// pipelines keep working without the legacy components.
+function migrateNodes(nodes) {
+  if (!Array.isArray(nodes)) return [];
+  return nodes.map((n) => {
+    if (n?.type !== 'dataverseView') return n;
+    return {
+      ...n,
+      type: 'dataverseInput',
+      data: {
+        ...n.data,
+        config: { ...(n.data?.config || {}), mode: 'view' },
+      },
+    };
+  });
+}
 
 function snap(p) {
   const grid = 20;
@@ -207,7 +228,6 @@ function prettyName(type) {
   return (
     {
       dataverseInput: 'Dataverse Input',
-      dataverseView:  'Dataverse View',
       xlsxInput: 'XLSX Input',
       csvInput: 'CSV Input',
       manualData: 'Manual Data',
