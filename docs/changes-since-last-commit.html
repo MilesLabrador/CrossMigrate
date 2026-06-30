@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CrossMigrate — Changes Since Last Commit</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #161927;
+    --card-alt: #1c2032;
+    --border: #2a304a;
+    --text: #e2e4ed;
+    --text-dim: #94a3b8;
+    --text-dimmer: #64748b;
+    --green: #22c55e;
+    --sky: #38bdf8;
+    --amber: #f59e0b;
+    --rose: #fb7185;
+    --violet: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    line-height: 1.55;
+  }
+  header {
+    padding: 40px 48px 28px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #161a28 0%, #0f1117 100%);
+  }
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+  }
+  header h1 span.brand { color: var(--green); }
+  header p.meta {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  header p.meta code {
+    background: var(--card-alt);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 40px 48px 80px;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 44px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .stat-card .num {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--sky);
+  }
+  .stat-card .label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dimmer);
+    margin-top: 2px;
+  }
+  section.feature {
+    margin-bottom: 40px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .feature-head {
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card-alt);
+  }
+  .feature-head .badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .badge.feature-tag { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge.fix-tag { background: rgba(251,113,133,0.15); color: var(--rose); }
+  .badge.infra-tag { background: rgba(167,139,250,0.15); color: var(--violet); }
+  .feature-head h2 {
+    margin: 0;
+    font-size: 17px;
+  }
+  .feature-body { padding: 20px 24px 24px; }
+  .feature-body p { margin: 0 0 12px; color: var(--text); }
+  .feature-body p.why {
+    color: var(--text-dim);
+    border-left: 3px solid var(--sky);
+    padding-left: 12px;
+    margin: 14px 0;
+  }
+  .feature-body p.why b { color: var(--sky); }
+  ul.bug-trail {
+    margin: 10px 0 16px;
+    padding-left: 0;
+    list-style: none;
+  }
+  ul.bug-trail li {
+    position: relative;
+    padding: 6px 0 6px 22px;
+    color: var(--text-dim);
+    font-size: 13.5px;
+  }
+  ul.bug-trail li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--amber);
+  }
+  ul.bug-trail li b { color: var(--text); }
+  .files {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .files code {
+    background: var(--card-alt);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+  table.diffstat {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+  table.diffstat th {
+    text-align: left;
+    color: var(--text-dimmer);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.diffstat td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #20253a;
+    color: var(--text-dim);
+  }
+  table.diffstat td.file { color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+  table.diffstat td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ins { color: var(--green); }
+  .del { color: var(--rose); }
+  footer {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 0 48px 60px;
+    color: var(--text-dimmer);
+    font-size: 12.5px;
+  }
+  footer a { color: var(--sky); }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 22px;
+    margin-bottom: 36px;
+  }
+  .toc h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dimmer); }
+  .toc a {
+    display: block;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 4px 0;
+  }
+  .toc a:hover { color: var(--sky); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="brand">CrossMigrate</span> — Changes Since Last Commit</h1>
+  <p class="meta">
+    Base commit <code>9731130</code> (Harden uploads handling and merge Dataverse View into input node) · uncommitted working tree
+  </p>
+</header>
+
+<main>
+
+  <div class="summary-grid">
+    <div class="stat-card"><div class="num">609</div><div class="label">Lines added</div></div>
+    <div class="stat-card"><div class="num">95</div><div class="label">Lines removed</div></div>
+    <div class="stat-card"><div class="num">9</div><div class="label">Files with real changes</div></div>
+    <div class="stat-card"><div class="num">2</div><div class="label">New files</div></div>
+  </div>
+
+  <div class="toc">
+    <h3>On this page</h3>
+    <a href="#filter">1. Field-stat filtering (column pruning)</a>
+    <a href="#contextmenu">2. Right-click node menu (single &amp; multi-select)</a>
+    <a href="#multiselect">3. Shift-drag box select, fixed</a>
+    <a href="#groups">4. Node grouping with notes</a>
+    <a href="#selection-saga">5. The selection/crash saga (and the real fix)</a>
+    <a href="#diffstat">6. Raw diff stats</a>
+    <a href="#noise">7. Everything else (file-mode noise)</a>
+  </div>
+
+  <section class="feature" id="filter">
+    <div class="feature-head">
+      <span class="badge feature-tag">Feature</span>
+      <h2>Field-stat filtering — drop sparse/low-quality columns</h2>
+    </div>
+    <div class="feature-body">
+      <p>
+        The <b>Filter</b> node previously only filtered <i>rows</i> by a cell's value. It now supports a second
+        condition <b>scope</b>: <code>field</code>, which filters out entire <i>columns</i> based on computed
+        statistics — fill %, unique count, null count, inferred type, or field name.
+      </p>
+      <p class="why">
+        <b>Why:</b> useful for data-cleaning before export — e.g. "drop columns with fill % below 90" or
+        "drop columns with 0 unique values" — without needing a separate node type.
+      </p>
+      <p>Each condition in the UI can now be toggled between <b>Row</b> and <b>Field</b> scope, with the
+      operator list and value input adapting to the selected stat (numeric comparisons for fill %, an enum
+      dropdown for type, text ops for name). The canvas node badges field-scope conditions in green so they're
+      visually distinct from row filters at a glance.</p>
+      <div class="files">
+        <code>server/engine/transforms/filter.js</code>
+        <code>client/src/components/configs/FilterConfig.jsx</code>
+        <code>client/src/nodes/FilterNode.jsx</code>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature" id="contextmenu">
+    <div class="feature-head">
+      <span class="badge feature-tag">Feature</span>
+      <h2>Right-click context menu on canvas nodes</h2>
+    </div>
+    <div class="feature-body">
+      <p>
+        Right-clicking a node now opens a small dropdown with <b>Duplicate</b> and <b>Delete</b>. When multiple
+        nodes are selected, the same right-click instead offers <b>Duplicate N nodes</b>, <b>Group N nodes</b>,
+        and <b>Delete N nodes</b>, operating on the whole selection at once.
+      </p>
+      <p class="why"><b>Why:</b> requested directly — there was previously no way to remove or copy a node except
+      dragging it to delete or rebuilding it from scratch.</p>
+      <ul class="bug-trail">
+        <li><b>Bug:</b> right-click would open the menu then immediately close it on the same click, because a
+        global "click outside closes the menu" listener was attached synchronously and caught the very event
+        that opened it. Fixed by deferring listener attachment to the next animation frame.</li>
+        <li><b>Bug:</b> right-clicking on a node that was part of a box-selected group fell through to the
+        browser's native context menu instead of the app's. React Flow renders an invisible drag overlay
+        (<code>.react-flow__nodesselection-rect</code>) on top of multi-selected nodes for group-dragging, and
+        right-clicks land on that overlay, not the node — so <code>onNodeContextMenu</code> never fired. Fixed
+        by also wiring up React Flow's <code>onSelectionContextMenu</code>, which is built for exactly this case.</li>
+      </ul>
+      <div class="files"><code>client/src/components/Canvas.jsx</code></div>
+    </div>
+  </section>
+
+  <section class="feature" id="multiselect">
+    <div class="feature-head">
+      <span class="badge fix-tag">Fix</span>
+      <h2>Shift-drag box select wasn't selecting multiple nodes</h2>
+    </div>
+    <div class="feature-body">
+      <p>
+        Holding Shift and dragging on empty canvas is supposed to draw a marquee and select every node inside
+        it. This was completely broken — the canvas always forced each node's visual "selected" state from a
+        single <code>selectedNodeId</code> on every render, which silently overwrote whatever React Flow's own
+        multi-select logic had just computed.
+      </p>
+      <p class="why"><b>Why:</b> requested directly, and needed as a foundation for the new bulk
+      delete/duplicate/group context-menu actions above.</p>
+      <p>Fixed by letting React Flow own each node's <code>selected</code> flag directly (no re-derivation), and
+      syncing the app's single-selection concept (used to open the config panel) via React Flow's
+      <code>onSelectionChange</code>/<code>onSelectionStart</code>/<code>onSelectionEnd</code> hooks, buffering
+      changes during an active drag so the panel doesn't open/close mid-drag.</p>
+      <div class="files"><code>client/src/components/Canvas.jsx</code></div>
+    </div>
+  </section>
+
+  <section class="feature" id="groups">
+    <div class="feature-head">
+      <span class="badge feature-tag">Feature</span>
+      <h2>Node grouping with notes</h2>
+    </div>
+    <div class="feature-body">
+      <p>
+        Selecting 2+ nodes and choosing <b>Group N nodes</b> from the context menu wraps them in a new
+        <b>Group</b> node — a resizable, dashed-border container with a draggable title bar. Group nodes carry
+        a name and a free-text <b>notes</b> field, useful for annotating why a cluster of nodes exists.
+      </p>
+      <p class="why"><b>Why:</b> requested directly, modeled on the "frame" concept from design tools like
+      Figma — a way to visually organize and document a pipeline without affecting its execution.</p>
+      <p>Clicking a group's title bar opens the same right-hand config panel used by every other node, showing
+      the editable name and notes textarea. Deleting a group ungroups its children (converting their position
+      back to absolute canvas coordinates) rather than deleting them — grouping is purely organizational, never
+      destructive. Group nodes are excluded from the payload sent to <code>/api/run-pipeline</code> since they
+      have no data role.</p>
+      <div class="files">
+        <code>client/src/nodes/GroupNode.jsx <span style="color:var(--green)">(new)</span></code>
+        <code>client/src/components/configs/GroupConfig.jsx <span style="color:var(--green)">(new)</span></code>
+        <code>client/src/components/ConfigPanel.jsx</code>
+        <code>client/src/components/Toolbar.jsx</code>
+        <code>client/src/store/usePipelineStore.js</code>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature" id="selection-saga">
+    <div class="feature-head">
+      <span class="badge fix-tag">Fix</span>
+      <h2>Node selection &amp; click-to-delete — a three-round bug chase</h2>
+    </div>
+    <div class="feature-body">
+      <p>This was the most involved fix of the session, and worth documenting in full because the first two
+      attempts each fixed one symptom while introducing another.</p>
+
+      <ul class="bug-trail">
+        <li><b>Round 1 — "single click doesn't select the node":</b> diagnosed (incorrectly) as
+        <code>NodeShell</code>'s <code>stopPropagation()</code> fully blocking React Flow's native selection.
+        Fix attempt: made the <code>selectNode</code> store action also write <code>selected: true/false</code>
+        directly onto node objects.</li>
+        <li><b>Regression from round 1:</b> clicking back and forth between two <i>edge-connected</i> nodes
+        (e.g. CSV Input → Preview Columns) crashed the app to a black screen (React's "Maximum update depth
+        exceeded", unmounting with no error boundary). The redundant, app-level selection write fought with
+        React Flow's own internal selection/edge bookkeeping specifically when an edge was present.</li>
+        <li><b>Round 2 — revert:</b> removed the direct node-mutation from <code>selectNode</code>, restoring
+        stability. But this reintroduced round 1's original symptom for real: clicking a node now neither
+        highlighted it nor let Backspace delete it (delete-by-key depends on React Flow's own
+        <code>node.selected</code>, which was never being set).</li>
+        <li><b>Round 3 — actual root cause:</b> <code>NodeShell</code>'s outer click handler really was calling
+        <code>e.stopPropagation()</code>, which <i>does</i> block React Flow's native click-to-select (wired on
+        the parent node wrapper). The correct fix was simply to stop swallowing the event — let the click bubble
+        so React Flow's own mechanism owns <code>selected</code>, and use the local click handler only to open
+        the config panel.</li>
+      </ul>
+      <p class="why"><b>Why this took three passes:</b> synthetic test clicks (dispatched via JS, not real mouse
+      events) don't reproduce browser click semantics exactly — React Flow's selection is actually driven by a
+      native <code>pointerdown</code> listener from its drag library, not the React-level <code>click</code>
+      event, so naive single-event tests gave misleading signal at each step. The final fix was verified with a
+      realistic pointerdown→pointerup→click sequence across multiple connected nodes, confirming both visual
+      selection and Backspace-delete work without the crash recurring.</p>
+      <div class="files">
+        <code>client/src/components/NodeShell.jsx</code>
+        <code>client/src/store/usePipelineStore.js</code>
+        <code>client/src/components/Canvas.jsx</code>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature" id="diffstat">
+    <div class="feature-head">
+      <span class="badge infra-tag">Reference</span>
+      <h2>Raw diff stats (content changes only)</h2>
+    </div>
+    <div class="feature-body">
+      <table class="diffstat">
+        <thead><tr><th>File</th><th>Change</th></tr></thead>
+        <tbody>
+          <tr><td class="file">client/src/components/Canvas.jsx</td><td class="num"><span class="ins">+172</span> / multi-edit</td></tr>
+          <tr><td class="file">client/src/store/usePipelineStore.js</td><td class="num"><span class="ins">+113</span> / multi-edit</td></tr>
+          <tr><td class="file">client/src/components/configs/FilterConfig.jsx</td><td class="num"><span class="ins">+182</span> / multi-edit</td></tr>
+          <tr><td class="file">server/engine/transforms/filter.js</td><td class="num"><span class="ins">+107</span> / multi-edit</td></tr>
+          <tr><td class="file">client/src/nodes/FilterNode.jsx</td><td class="num"><span class="ins">+37</span> / multi-edit</td></tr>
+          <tr><td class="file">client/src/components/NodeShell.jsx</td><td class="num">~10 lines</td></tr>
+          <tr><td class="file">client/src/components/ConfigPanel.jsx</td><td class="num"><span class="ins">+2</span></td></tr>
+          <tr><td class="file">client/src/components/Toolbar.jsx</td><td class="num">~1 line</td></tr>
+          <tr><td class="file">client/src/nodes/GroupNode.jsx</td><td class="num"><span class="ins">new file</span></td></tr>
+          <tr><td class="file">client/src/components/configs/GroupConfig.jsx</td><td class="num"><span class="ins">new file</span></td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:14px;">Total across the working tree: <span class="ins">609 insertions</span>,
+      <span class="del">95 deletions</span>, across 92 changed paths.</p>
+    </div>
+  </section>
+
+  <section class="feature" id="noise">
+    <div class="feature-head">
+      <span class="badge infra-tag">Noise</span>
+      <h2>Everything else in <code>git status</code> is not a real change</h2>
+    </div>
+    <div class="feature-body">
+      <p>
+        The remaining ~80 files showing as modified (most of <code>client/src</code>, all of
+        <code>server/routes</code>, the lockfiles, README, LICENSE, image assets, etc.) have <b>zero content
+        diff</b> — only their file mode flipped from <code>644</code> to <code>755</code> (executable bit),
+        most likely from a stray <code>chmod</code> run at some point. Three binary files
+        (<code>node-badges-*.png</code>, <code>sample-data.xlsx</code>, <code>deduplicate.js</code>) are flagged
+        as changed but are byte-identical in size — likely touched but not actually edited.
+      </p>
+      <p>None of this needs review; it's safe to leave out of any commit message, or reset the mode bits
+      separately if desired.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Generated from the working tree diff against commit <code>9731130</code> in the CrossMigrate repository.
+</footer>
+
+</body>
+</html>

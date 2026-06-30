@@ -203,7 +203,7 @@ export default function Toolbar() {
     // ── Build slim payload from latest store state ────────────────────────────
     const latestEdges = usePipelineStore.getState().edges;
     const slim = {
-      nodes: latestNodes.map((n) => ({
+      nodes: latestNodes.filter((n) => n.type !== 'group').map((n) => ({
         id: n.id, type: n.type, position: n.position,
         data: { name: n.data?.name, config: n.data?.config, rows: n.data?.rows, columns: n.data?.columns },
       })),

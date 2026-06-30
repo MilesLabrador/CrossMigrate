@@ -16,6 +16,7 @@ import RandomSampleConfig from './configs/RandomSampleConfig';
 import CSVExportConfig from './configs/CSVExportConfig';
 import DataverseOutputConfig from './configs/DataverseOutputConfig';
 import PreviewConfig from './configs/PreviewConfig';
+import GroupConfig from './configs/GroupConfig';
 
 const REGISTRY = {
   dataverseInput: { title: 'Dataverse Input', Comp: DataverseInputConfig },
@@ -34,6 +35,7 @@ const REGISTRY = {
   dataverseOutput: { title: 'Dataverse Output', Comp: DataverseOutputConfig },
   preview: { title: 'Preview', Comp: PreviewConfig },
   previewColumns: { title: 'Preview Columns', Comp: () => <div className="text-xs text-slate-400">Schema is inferred automatically when the pipeline runs. No configuration needed.</div> },
+  group: { title: 'Group', Comp: GroupConfig },
 };
 
 export default function ConfigPanel() {

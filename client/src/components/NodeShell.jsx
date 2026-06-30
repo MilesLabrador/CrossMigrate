@@ -191,7 +191,15 @@ export default function NodeShell({
      */
     <div
       ref={nodeRef}
-      onClick={(e) => { e.stopPropagation(); selectNode(id); }}
+      // Deliberately NOT stopping propagation here: React Flow's own node
+      // selection (which drives the visual ring, backspace-to-delete, and
+      // box-select interplay) is wired through its native click/mousedown
+      // handling on the node wrapper above this element. Swallowing the
+      // click here used to require manually re-deriving `selected` elsewhere,
+      // which caused an update-depth crash on edge-connected nodes — instead
+      // let the click bubble so React Flow's own mechanism owns selection,
+      // and only use it here to open the config panel.
+      onClick={() => selectNode(id)}
       className={clsx(
         'group animate-scale-in relative',
         !customW && widthClass,

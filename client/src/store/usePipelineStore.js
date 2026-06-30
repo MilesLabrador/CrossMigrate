@@ -31,7 +31,13 @@ export const NODE_DEFAULTS = {
   sqlInput:  { config: { type: 'postgres', host: 'localhost', port: '5432', user: '', password: '', database: '', table: '' }, rows: [], columns: [] },
   sqlOutput: { config: { type: 'postgres', host: 'localhost', port: '5432', user: '', password: '', database: '', table: '', mode: 'insert', conflictColumn: '' } },
   fieldUsage: { config: {} },
+  group: { config: { notes: '' } },
 };
+
+// Rough footprint used only for sizing a new group's bounding box — node
+// cards aren't measured here, so this is an estimate, not a layout source of truth.
+const DEFAULT_NODE_W = 256;
+const DEFAULT_NODE_H = 110;
 
 function loadEnvironments() {
   try {
@@ -133,14 +139,108 @@ export const usePipelineStore = create((set, get) => ({
       ),
     }),
 
-  deleteNode: (id) =>
-    set({
-      nodes: get().nodes.filter((n) => n.id !== id),
-      edges: get().edges.filter((e) => e.source !== id && e.target !== id),
-      selectedNodeId: get().selectedNodeId === id ? null : get().selectedNodeId,
-      configPanelOpen: get().selectedNodeId === id ? false : get().configPanelOpen,
-    }),
+  deleteNode: (id) => get().deleteNodes([id]),
 
+  deleteNodes: (ids) => {
+    const idSet = new Set(ids);
+    const allNodes = get().nodes;
+    // Children of a deleted group lose their parent — convert their position
+    // back to absolute (canvas-space) so they don't jump/disappear, rather
+    // than cascading the delete onto them.
+    const removedParents = new Map(
+      allNodes.filter((n) => idSet.has(n.id) && n.type === 'group').map((n) => [n.id, n.position])
+    );
+    set({
+      nodes: allNodes
+        .filter((n) => !idSet.has(n.id))
+        .map((n) => {
+          if (!n.parentId || !removedParents.has(n.parentId)) return n;
+          const parentPos = removedParents.get(n.parentId);
+          const { parentId, extent, ...rest } = n;
+          return { ...rest, position: { x: n.position.x + parentPos.x, y: n.position.y + parentPos.y } };
+        }),
+      edges: get().edges.filter((e) => !idSet.has(e.source) && !idSet.has(e.target)),
+      selectedNodeId: idSet.has(get().selectedNodeId) ? null : get().selectedNodeId,
+      configPanelOpen: idSet.has(get().selectedNodeId) ? false : get().configPanelOpen,
+    });
+  },
+
+  duplicateNode: (id) => get().duplicateNodes([id])[0],
+
+  duplicateNodes: (ids) => {
+    const allNodes = get().nodes;
+    const targets = allNodes.filter((n) => ids.includes(n.id));
+    if (!targets.length) return [];
+    const idMap = new Map(targets.map((n) => [n.id, `${n.type}_${nanoid(6)}`]));
+    const copies = targets.map((n) => ({
+      ...n,
+      id: idMap.get(n.id),
+      // Re-point to a duplicated parent if it's in the same batch; otherwise
+      // keep belonging to the original (un-duplicated) group.
+      parentId: n.parentId && idMap.has(n.parentId) ? idMap.get(n.parentId) : n.parentId,
+      position: n.parentId ? n.position : snap({ x: n.position.x + 40, y: n.position.y + 40 }),
+      selected: false,
+      data: { ...n.data, config: { ...(n.data.config || {}) } },
+    }));
+    set({ nodes: [...allNodes, ...copies] });
+    return copies.map((c) => c.id);
+  },
+
+  groupNodes: (ids) => {
+    const allNodes = get().nodes;
+    const targets = allNodes.filter((n) => ids.includes(n.id) && !n.parentId && n.type !== 'group');
+    if (targets.length < 2) return;
+
+    const PAD_TOP = 56;
+    const PAD = 24;
+    const left   = Math.min(...targets.map((n) => n.position.x));
+    const top    = Math.min(...targets.map((n) => n.position.y));
+    const right  = Math.max(...targets.map((n) => n.position.x + (n.data?._width  || DEFAULT_NODE_W)));
+    const bottom = Math.max(...targets.map((n) => n.position.y + (n.data?._height || DEFAULT_NODE_H)));
+
+    const groupId = `group_${nanoid(6)}`;
+    const groupPos = { x: left - PAD, y: top - PAD_TOP };
+    const groupNode = {
+      id: groupId,
+      type: 'group',
+      position: groupPos,
+      style: { width: (right - left) + PAD * 2, height: (bottom - top) + PAD_TOP + PAD },
+      dragHandle: '.group-drag-handle',
+      data: { name: 'Group', config: { notes: '' } },
+    };
+
+    const targetIds = new Set(targets.map((n) => n.id));
+    const newNodes = [];
+    let inserted = false;
+    for (const n of allNodes) {
+      if (targetIds.has(n.id)) {
+        if (!inserted) { newNodes.push(groupNode); inserted = true; }
+        newNodes.push({
+          ...n,
+          parentId: groupId,
+          extent: 'parent',
+          selected: false,
+          position: { x: n.position.x - groupPos.x, y: n.position.y - groupPos.y },
+        });
+      } else {
+        newNodes.push(n);
+      }
+    }
+    if (!inserted) newNodes.push(groupNode);
+
+    set({ nodes: newNodes, selectedNodeId: groupId, configPanelOpen: true });
+    return groupId;
+  },
+
+  // NodeShell's onClick stops the React synthetic 'click' from bubbling, but
+  // React Flow's own node selection (addSelectedNodes) is triggered earlier,
+  // on the native 'mousedown' phase, by its internal drag library (XYDrag) —
+  // a separate, non-React listener that stopPropagation on 'click' can't
+  // block. So real clicks already get `node.selected` set correctly through
+  // React Flow's own path; this action only needs to own selectedNodeId/the
+  // config panel. (An earlier version also wrote `selected` here directly,
+  // which double-drove selection alongside React Flow's own mousedown path
+  // and caused an update-depth crash specifically on edge-connected nodes.)
   selectNode: (id) => set({ selectedNodeId: id, configPanelOpen: !!id }),
   closeConfigPanel: () => set({ configPanelOpen: false }),
 
@@ -244,6 +344,7 @@ function prettyName(type) {
       dataverseOutput: 'Dataverse Output',
       sqlInput:  'SQL Input',
       sqlOutput: 'SQL Output',
+      group: 'Group',
     }[type] || type
   );
 }
