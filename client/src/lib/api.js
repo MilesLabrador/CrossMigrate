@@ -1,4 +1,20 @@
 // Thin API wrappers — Vite proxies /api -> :3001
+export async function fetchPipeline(id) {
+  const r = await fetch(`/api/pipelines/${encodeURIComponent(id)}`);
+  if (!r.ok) throw new Error(`pipelines: ${r.status}`);
+  return r.json(); // null if never saved
+}
+
+export async function savePipelineRemote(id, { projectName, nodes, edges }) {
+  const r = await fetch(`/api/pipelines/${encodeURIComponent(id)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectName, nodes, edges }),
+  });
+  if (!r.ok) throw new Error(`pipelines: ${r.status}`);
+  return r.json();
+}
+
 export async function fetchEntities(orgUrl = '') {
   const qs = orgUrl ? `?orgUrl=${encodeURIComponent(orgUrl)}` : '';
   const r = await fetch(`/api/entities${qs}`);

@@ -1,10 +1,24 @@
 import { create } from 'zustand';
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react';
 import { nanoid } from 'nanoid';
+import { fetchPipeline, savePipelineRemote } from '../lib/api';
 
 const ENV_KEY = 'crossmigrate:environments';
 
 const STORAGE_KEY = 'crossmigrate:pipeline';
+const PIPELINE_ID_KEY = 'crossmigrate:pipelineId';
+
+// The backend identifies a saved pipeline by this id (server/pipelines/<id>.json).
+// It's generated once per browser and reused across saves/reloads — there's no
+// project list UI yet, so this just gives autosave a stable file to sync to.
+function getOrCreatePipelineId() {
+  let id = localStorage.getItem(PIPELINE_ID_KEY);
+  if (!id) {
+    id = nanoid(10);
+    localStorage.setItem(PIPELINE_ID_KEY, id);
+  }
+  return id;
+}
 
 export const NODE_DEFAULTS = {
   // Unified Dataverse source: `mode` switches between an OData column query and
@@ -55,6 +69,8 @@ const initial = {
   running: false,
   nodeStatus: {},
   drag: null,
+  pipelineId: getOrCreatePipelineId(),
+  autosaveStatus: 'idle', // 'idle' | 'saving' | 'saved' | 'error'
 };
 
 export const usePipelineStore = create((set, get) => ({
@@ -277,7 +293,7 @@ export const usePipelineStore = create((set, get) => ({
 
   save: () => {
     const { projectName, nodes, edges } = get();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ projectName, nodes, edges }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ projectName, nodes, edges, updatedAt: Date.now() }));
     return true;
   },
   load: () => {
@@ -286,6 +302,39 @@ export const usePipelineStore = create((set, get) => ({
     try {
       const { projectName, nodes, edges } = JSON.parse(raw);
       set({ projectName, nodes: migrateNodes(nodes || []), edges: edges || [], nodeStatus: {} });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  // Pushes the current pipeline to the server (server/pipelines/<pipelineId>.json)
+  // so autosave survives more than just this browser's localStorage. Best-effort —
+  // network hiccups shouldn't interrupt editing, so failures only surface via
+  // `autosaveStatus` for the toolbar's indicator.
+  syncRemote: async () => {
+    const { pipelineId, projectName, nodes, edges } = get();
+    set({ autosaveStatus: 'saving' });
+    try {
+      await savePipelineRemote(pipelineId, { projectName, nodes, edges });
+      set({ autosaveStatus: 'saved' });
+    } catch {
+      set({ autosaveStatus: 'error' });
+    }
+  },
+  // Hydrates from the server copy if one exists — used on startup so a browser
+  // that has lost its localStorage (or never had one) still recovers the last
+  // autosaved pipeline for this id.
+  loadRemote: async () => {
+    const { pipelineId } = get();
+    try {
+      const remote = await fetchPipeline(pipelineId);
+      if (!remote) return false;
+      set({
+        projectName: remote.projectName || 'Untitled pipeline',
+        nodes: migrateNodes(remote.nodes || []),
+        edges: remote.edges || [],
+        nodeStatus: {},
+      });
       return true;
     } catch {
       return false;

@@ -20,7 +20,7 @@ export default function Toolbar() {
   const {
     projectName, setProjectName,
     save, clearCanvas, loadFromObject, serialize,
-    nodes, edges,
+    nodes, edges, autosaveStatus,
     setRunning, running,
     setNodeStatus, resetNodeStatuses,
     updateNodeData,
@@ -268,6 +268,7 @@ export default function Toolbar() {
             {savedFlash ? <CheckCircle2 size={14} className="text-emerald-400" /> : <Save size={14} />}
             {savedFlash ? 'Saved!' : savedAt ? `Saved ${savedAt}` : 'Save'}
           </button>
+          <AutosaveIndicator status={autosaveStatus} />
           <Btn onClick={onExportFile} icon={<Download size={14} />}>Export</Btn>
           <Btn onClick={() => fileInputRef.current?.click()} icon={<Upload size={14} />}>Import</Btn>
           <input ref={fileInputRef} type="file" accept=".json,.crossmigrate.json" onChange={onImportFile} className="hidden" />
@@ -406,6 +407,29 @@ export default function Toolbar() {
         </div>
       )}
     </>
+  );
+}
+
+function AutosaveIndicator({ status }) {
+  if (status === 'idle') return null;
+  if (status === 'saving') {
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-slate-500" title="Autosaving to server…">
+        <Loader2 size={11} className="animate-spin" /> Autosaving
+      </span>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-rose-400" title="Couldn't reach the server — your local save is still up to date">
+        <AlertCircle size={11} /> Autosave failed
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 text-[11px] text-slate-500" title="Synced to server">
+      <CheckCircle2 size={11} className="text-emerald-500" /> Autosaved
+    </span>
   );
 }
 

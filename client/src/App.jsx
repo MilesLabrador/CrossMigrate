@@ -10,8 +10,32 @@ import { recordGestureOrigin } from './lib/gestureTracker';
 export default function App() {
   const { save, load } = usePipelineStore();
 
-  // Auto-restore last saved pipeline on startup
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Auto-restore last saved pipeline on startup. localStorage is the fast,
+  // always-available copy; only fall back to the server copy when this
+  // browser has none (e.g. storage was cleared).
+  useEffect(() => {
+    if (!load()) usePipelineStore.getState().loadRemote();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced autosave: every pipeline edit re-saves to localStorage quickly
+  // (crash-safety) and syncs to the server shortly after (durable backup).
+  // Separate timers so a flaky network doesn't delay the local save.
+  useEffect(() => {
+    let localTimer = null;
+    let remoteTimer = null;
+    const unsubscribe = usePipelineStore.subscribe((state, prev) => {
+      if (state.nodes === prev.nodes && state.edges === prev.edges && state.projectName === prev.projectName) return;
+      clearTimeout(localTimer);
+      clearTimeout(remoteTimer);
+      localTimer = setTimeout(() => usePipelineStore.getState().save(), 800);
+      remoteTimer = setTimeout(() => usePipelineStore.getState().syncRemote(), 2000);
+    });
+    return () => {
+      unsubscribe();
+      clearTimeout(localTimer);
+      clearTimeout(remoteTimer);
+    };
+  }, []);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -19,6 +43,7 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         save();
+        usePipelineStore.getState().syncRemote();
       }
     };
     window.addEventListener('keydown', onKey);

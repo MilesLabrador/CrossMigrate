@@ -14,5 +14,6 @@ server/uploads/*
 uploads/*
 !uploads/.gitkeep
 server/mappings/*.json
+server/pipelines/*.json
 .vite
 /.claude

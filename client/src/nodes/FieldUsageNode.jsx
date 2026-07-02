@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BarChart2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { BarChart2, ChevronUp, ChevronDown, ChevronRight, ChevronsUpDown } from 'lucide-react';
 import NodeShell from '../components/NodeShell';
 import { usePipelineStore } from '../store/usePipelineStore';
 
@@ -34,6 +34,15 @@ export default function FieldUsageNode({ id, selected }) {
   const rowCount = status?.meta?.rowCount ?? null;
 
   const [sort, setSort] = useState({ col: 'fill', dir: 'desc' });
+  const [expanded, setExpanded] = useState(() => new Set());
+
+  const toggleExpanded = (name) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
 
   const onSort = (col) => {
     setSort((s) => s.col === col
@@ -79,11 +88,12 @@ export default function FieldUsageNode({ id, selected }) {
           </div>
 
           {/* Sortable column headers */}
-          <div className="grid grid-cols-[1fr_52px_44px_44px] gap-x-2 px-1 pb-1 border-b border-slate-700/60">
+          <div className="grid grid-cols-[1fr_52px_44px_44px_12px] gap-x-2 px-1 pb-1 border-b border-slate-700/60">
             <SortHeader label="Field"  col="name"   sort={sort} onSort={onSort} />
             <SortHeader label="Fill%"  col="fill"   sort={sort} onSort={onSort} className="justify-end" />
             <SortHeader label="Uniq"   col="unique" sort={sort} onSort={onSort} className="justify-end" />
             <SortHeader label="Type"   col="type"   sort={sort} onSort={onSort} />
+            <span />
           </div>
 
           <div
@@ -91,9 +101,14 @@ export default function FieldUsageNode({ id, selected }) {
           >
             {sorted.map((f) => {
               const fillColor = f.fillPct >= 90 ? 'bg-emerald-500' : f.fillPct >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+              const hasSamples = f.samples?.length > 0;
+              const isOpen = hasSamples && expanded.has(f.name);
               return (
-                <div key={f.name} className="group">
-                  <div className="grid grid-cols-[1fr_52px_44px_44px] gap-x-2 items-center px-1 py-0.5 rounded hover:bg-slate-800/60">
+                <div key={f.name}>
+                  <div
+                    className={`grid grid-cols-[1fr_52px_44px_44px_12px] gap-x-2 items-center px-1 py-0.5 rounded hover:bg-slate-800/60 ${hasSamples ? 'cursor-pointer' : ''}`}
+                    onClick={hasSamples ? () => toggleExpanded(f.name) : undefined}
+                  >
                     <span className="text-[11px] text-slate-200 truncate font-mono" title={f.name}>{f.name}</span>
                     <div className="flex flex-col items-end gap-0.5">
                       <span className="text-[10px] text-slate-300">{f.fillPct}%</span>
@@ -105,9 +120,18 @@ export default function FieldUsageNode({ id, selected }) {
                     <span className={`text-[9px] font-semibold uppercase tracking-wider ${TYPE_COLORS[f.type] || TYPE_COLORS.text}`}>
                       {f.type}
                     </span>
+                    {hasSamples ? (
+                      isOpen
+                        ? <ChevronDown size={11} className="text-slate-500" />
+                        : <ChevronRight size={11} className="text-slate-500" />
+                    ) : <span />}
                   </div>
-                  {f.samples?.length > 0 && (
-                    <div className="hidden group-hover:flex flex-wrap gap-1 px-2 pb-1">
+                  {isOpen && (
+                    /* In-flow "drawer" — pushes the rows below it down. Safe now that
+                       expansion is click-triggered rather than hover-triggered: it only
+                       grows the node when the user deliberately asks for it, not while
+                       they're passing the cursor over a row mid-drag. */
+                    <div className="flex flex-wrap gap-1 px-2 py-1 mb-0.5 bg-slate-900/60 border border-slate-700/60 rounded">
                       {f.samples.map((s, i) => (
                         <span key={i} className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={String(s)}>
                           {String(s)}
