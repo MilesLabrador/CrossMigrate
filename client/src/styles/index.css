@@ -53,6 +53,18 @@ html, body, #root {
 .handle-transform {
   background: #94a3b8;
 }
+.handle-join {
+  background: #f59e0b;
+}
+.handle-join:hover {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+}
+.handle-errors {
+  background: #f43f5e;
+}
+.handle-errors:hover {
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.3);
+}
 .handle-destination {
   background: #f43f5e;
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Download, Upload, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, User, UserPlus, Globe, Plus, Pencil, Trash } from 'lucide-react';
+import { Save, Download, Upload, Play, Trash2, Loader2, CheckCircle2, AlertCircle, AlertTriangle, User, UserPlus, Globe, Plus, Pencil, Trash, ScanSearch } from 'lucide-react';
 import { usePipelineStore } from '../store/usePipelineStore';
-import { runPipelineStream, fetchDataverseRows, fetchDataverseView, isAuthError } from '../lib/api';
+import { runPipelineStream, collectMetadata, fetchDataverseRows, fetchDataverseView, isAuthError } from '../lib/api';
 import SettingsModal from './SettingsModal';
 
 const SOURCE_TYPES = new Set(['csvInput', 'manualData', 'dataverseInput', 'sqlInput']);
@@ -15,6 +15,38 @@ const dvIsConfigured = (n) => {
   const c = n.data?.config || {};
   return isDvViewMode(n) ? !!(c.entity && c.fetchXml) : !!c.entity;
 };
+
+// ── Cache coverage ────────────────────────────────────────────────────────────
+// A cache node in auto mode with a warm server-side cache serves rows without
+// needing its input — so a source whose every downstream path first passes
+// through such a cache can skip fetching (and may legally run with 0 rows).
+const cacheWillServe = (n) =>
+  n?.type === 'cache' && (n.data?.config?.mode || 'auto') === 'auto' && n.data?._cache?.exists;
+
+function sourceCoveredByCache(sourceId, nodes, edges) {
+  const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+  const seen = new Set();
+  const stack = [sourceId];
+  let coveredSomething = false;
+  while (stack.length) {
+    const id = stack.pop();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (id !== sourceId) {
+      if (cacheWillServe(byId[id])) { coveredSomething = true; continue; } // path ends at a serving cache
+    }
+    const outs = edges.filter((e) => e.source === id);
+    if (!outs.length) {
+      // Reached a consumer/terminal without passing a warm cache — the
+      // source's real rows are needed (a dangling source needs nothing,
+      // but fetching it is the safer default).
+      if (id !== sourceId) return false;
+      return false;
+    }
+    for (const e of outs) stack.push(e.target);
+  }
+  return coveredSomething;
+}
 
 export default function Toolbar() {
   const {
@@ -30,6 +62,7 @@ export default function Toolbar() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
   const [runBanner, setRunBanner] = useState(null); // { kind, message }
+  const [collecting, setCollecting] = useState(false);
   const [authUser, setAuthUser]   = useState(null); // { name, username } | null
   const [showSettings, setShowSettings] = useState(false);
   const [showEnvMenu, setShowEnvMenu] = useState(false);
@@ -128,11 +161,108 @@ export default function Toolbar() {
     setEnvEdit(null);
   };
 
+  // ── Collect metadata: a sample-based dry run ───────────────────────────────
+  // Discovers which columns/types exist at every node so downstream configs
+  // can be set up precisely, without committing to a full pipeline run.
+  // Dataverse sources with no local rows fetch a small sample (kept in
+  // _metaRows, never in rows — a later full Run still fetches everything).
+  const META_FETCH_TOP = 25;
+  const onCollect = async () => {
+    if (!nodes.length || running || collecting) return;
+    setCollecting(true);
+    try {
+      const latest = usePipelineStore.getState().nodes;
+      const latestEdges = usePipelineStore.getState().edges;
+      // Sources collect cannot sample — surfaced at the end so an empty field
+      // list downstream is never a silent mystery.
+      const unsampled = [];
+      for (const n of latest) {
+        if (isDvNode(n) && !dvIsConfigured(n)) unsampled.push(`${n.data?.name || n.type} (no entity configured)`);
+        else if (isDvNode(n) && n.data?.config?.collectFetch === false && !(n.data?.rows?.length) && !sourceCoveredByCache(n.id, latest, latestEdges)) {
+          unsampled.push(`${n.data?.name || n.type} (sample fetch disabled)`);
+        } else if (!isDvNode(n) && SOURCE_TYPES.has(n.type) && !(n.data?.rows?.length) && !sourceCoveredByCache(n.id, latest, latestEdges)) {
+          unsampled.push(`${n.data?.name || n.type} (no data loaded)`);
+        }
+      }
+      const toFetch = latest.filter(
+        (n) =>
+          isDvNode(n) && dvIsConfigured(n) &&
+          !(n.data?.rows?.length) && !(n.data?._metaRows?.length) &&
+          n.data?.config?.collectFetch !== false &&
+          !sourceCoveredByCache(n.id, latest, latestEdges)
+      );
+      if (toFetch.length) {
+        showBanner('ok', `Fetching ${META_FETCH_TOP}-row samples from ${toFetch.length} Dataverse source${toFetch.length > 1 ? 's' : ''}…`, 0);
+      }
+      for (const n of toFetch) {
+        try {
+          const cfg = n.data.config;
+          const result = isDvViewMode(n)
+            ? await fetchDataverseView({
+                entityCollection: cfg.entity,
+                savedQueryId:     cfg.viewId,
+                orgUrl:           cfg.orgUrl || '',
+                top:              META_FETCH_TOP,
+                viewColumns:      cfg.viewColumns || [],
+              })
+            : await fetchDataverseRows({
+                entity: cfg.entity,
+                select: cfg.select || '',
+                filter: cfg.filter || '',
+                top:    META_FETCH_TOP,
+                orgUrl: cfg.orgUrl || '',
+              });
+          updateNodeData(n.id, { _metaRows: result.rows, columns: result.columns });
+        } catch (err) {
+          if (isAuthError(err.message)) {
+            unsampled.push(`${n.data?.name || n.type} (sign-in required)`);
+          } else {
+            unsampled.push(`${n.data?.name || n.type} (fetch failed: ${err.message})`);
+          }
+        }
+      }
+
+      const fresh = usePipelineStore.getState();
+      const payload = {
+        nodes: fresh.nodes.filter((n) => n.type !== 'group').map((n) => ({
+          id: n.id, type: n.type,
+          data: {
+            name: n.data?.name,
+            config: n.data?.config,
+            rows: (n.data?.rows?.length ? n.data.rows : n.data?._metaRows || []).slice(0, 100),
+            columns: n.data?.columns,
+          },
+        })),
+        edges: fresh.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle })),
+      };
+      const res = await collectMetadata(payload);
+      let errored = 0;
+      for (const [id, info] of Object.entries(res.nodes || {})) {
+        if (info.error) errored++;
+        setNodeStatus(id, { ...info, metaCollected: true });
+      }
+      if (unsampled.length) {
+        showBanner('warn', `Metadata collected, but some sources had nothing to sample — their fields are unknown: ${unsampled.join(' · ')}`, 12000);
+      } else if (errored) {
+        showBanner('warn', `Metadata collected with ${errored} node error${errored > 1 ? 's' : ''} — fields available where the sample got through`);
+      } else {
+        showBanner('ok', 'Metadata collected — fields and types are now available in every config panel (sample-based, nothing was run for real)');
+      }
+    } catch (err) {
+      console.error('collect metadata failed', err);
+      showBanner('error', `Collect metadata failed: ${err.message}`);
+    } finally {
+      setCollecting(false);
+    }
+  };
+
   const onRun = async () => {
     if (!nodes.length || running) return;
 
     setRunning(true);
-    resetNodeStatuses();
+    // NOTE: statuses (including Collect metadata results) are reset only once
+    // every pre-flight check has passed — a blocked run must not wipe the
+    // field metadata that config panels rely on.
 
     // ── Auto-fetch unconfigured check ─────────────────────────────────────────
     const unconfigured = nodes.filter((n) => isDvNode(n) && !dvIsConfigured(n));
@@ -143,8 +273,10 @@ export default function Toolbar() {
     }
 
     // ── Auto-fetch unfetched Dataverse source nodes ───────────────────────────
+    // (skipping any source whose consumers are all behind a warm cache)
     const unfetched = nodes.filter(
       (n) => isDvNode(n) && dvIsConfigured(n) && !(n.data?.rows?.length)
+        && !sourceCoveredByCache(n.id, nodes, edges)
     );
     if (unfetched.length) {
       showBanner('ok', `Auto-fetching ${unfetched.length} Dataverse source${unfetched.length > 1 ? 's' : ''}…`, 0);
@@ -190,15 +322,21 @@ export default function Toolbar() {
     }
 
     // ── Block if other source nodes are still empty ───────────────────────────
+    // (a source feeding only warm caches may legally run empty — the cache serves)
     const latestNodes = usePipelineStore.getState().nodes;
+    const latestEdgesForCheck = usePipelineStore.getState().edges;
     const emptySources = latestNodes.filter(
       (n) => SOURCE_TYPES.has(n.type) && !(n.data?.rows?.length)
+        && !sourceCoveredByCache(n.id, latestNodes, latestEdgesForCheck)
     );
     if (emptySources.length) {
       showBanner('warn', `${emptySources.map((n) => n.data?.name || n.type).join(', ')} has 0 rows — load data first`);
       setRunning(false);
       return;
     }
+
+    // All pre-flight checks passed — the run is really happening now.
+    resetNodeStatuses();
 
     // ── Build slim payload from latest store state ────────────────────────────
     const latestEdges = usePipelineStore.getState().edges;
@@ -207,7 +345,7 @@ export default function Toolbar() {
         id: n.id, type: n.type, position: n.position,
         data: { name: n.data?.name, config: n.data?.config, rows: n.data?.rows, columns: n.data?.columns },
       })),
-      edges: latestEdges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
+      edges: latestEdges.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle })),
     };
 
     let lastRowCount = 0;
@@ -345,6 +483,15 @@ export default function Toolbar() {
           </button>
 
           <div className="w-px h-5 bg-slate-700 mx-1" />
+          <button
+            onClick={onCollect}
+            disabled={collecting || running || !nodes.length}
+            title="Sample-based dry run: discover the columns & types available at every node so you can configure mappings and transforms before a real run. Dataverse sources fetch a small sample (toggle per node in its config)."
+            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-sky-700 hover:bg-sky-600 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0 whitespace-nowrap"
+          >
+            {collecting ? <Loader2 size={14} className="animate-spin" /> : <ScanSearch size={14} />}
+            {collecting ? 'Collecting…' : 'Collect metadata'}
+          </button>
           <button
             onClick={onRun}
             disabled={running || !nodes.length}

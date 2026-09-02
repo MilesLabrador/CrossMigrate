@@ -11,7 +11,11 @@ import SelectColumnsConfig from './configs/SelectColumnsConfig';
 import SelectMapConfig from './configs/SelectMapConfig';
 import FilterConfig from './configs/FilterConfig';
 import TransformConfig from './configs/TransformConfig';
+import ConvertTypesConfig from './configs/ConvertTypesConfig';
+import LookupConfig from './configs/LookupConfig';
+import CacheConfig from './configs/CacheConfig';
 import DeduplicateConfig from './configs/DeduplicateConfig';
+import JoinConfig from './configs/JoinConfig';
 import RandomSampleConfig from './configs/RandomSampleConfig';
 import CSVExportConfig from './configs/CSVExportConfig';
 import DataverseOutputConfig from './configs/DataverseOutputConfig';
@@ -29,7 +33,11 @@ const REGISTRY = {
   selectMap: { title: 'Select / Map', Comp: SelectMapConfig },
   filter: { title: 'Filter', Comp: FilterConfig },
   transform: { title: 'Transform', Comp: TransformConfig },
+  convertTypes: { title: 'Convert Types', Comp: ConvertTypesConfig },
+  lookup: { title: 'Lookup', Comp: LookupConfig },
+  cache: { title: 'Cache', Comp: CacheConfig },
   deduplicate:  { title: 'Deduplicate',   Comp: DeduplicateConfig },
+  join:         { title: 'Join',          Comp: JoinConfig },
   randomSample: { title: 'Random Sample', Comp: RandomSampleConfig },
   csvExport: { title: 'CSV Export', Comp: CSVExportConfig },
   dataverseOutput: { title: 'Dataverse Output', Comp: DataverseOutputConfig },

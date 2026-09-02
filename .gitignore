@@ -15,5 +15,10 @@ uploads/*
 !uploads/.gitkeep
 server/mappings/*.json
 server/pipelines/*.json
+# Cache-node row snapshots — user data, never commit
+server/cache/*.json
 .vite
 /.claude
+
+# IDE
+.idea/

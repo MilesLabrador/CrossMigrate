@@ -51,6 +51,43 @@ export async function fetchXlsxSheet(fileId, { sheet, header = true } = {}) {
   return r.json();
 }
 
+// Metadata-only dry run over row samples — returns { nodes: { [id]: { columns,
+// schema, sample, sampledRows, error? } } } without executing a full pipeline.
+export async function collectMetadata({ nodes, edges, sampleSize } = {}) {
+  const r = await fetch('/api/collect-metadata', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodes, edges, sampleSize }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `collect-metadata: ${r.status}`);
+  }
+  return r.json();
+}
+
+// Cache node support
+export async function fetchCacheStatus(key) {
+  const r = await fetch(`/api/cache-status?key=${encodeURIComponent(key)}`);
+  if (!r.ok) throw new Error(`cache-status: ${r.status}`);
+  return r.json();
+}
+
+// Every warm cache on the server — the Lookup node lists these as mapping
+// sources. Each entry: { key, label, cachedAt, rowCount, columns, sample }.
+export async function fetchCaches() {
+  const r = await fetch('/api/caches');
+  if (!r.ok) throw new Error(`caches: ${r.status}`);
+  const { caches } = await r.json();
+  return caches || [];
+}
+
+export async function clearCacheRemote(key) {
+  const r = await fetch(`/api/cache?key=${encodeURIComponent(key)}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error(`cache clear: ${r.status}`);
+  return r.json();
+}
+
 export async function uploadCsv(file, { delimiter = '', header = true, encoding = 'utf8' } = {}) {
   const fd = new FormData();
   fd.append('file', file);

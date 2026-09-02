@@ -6,8 +6,16 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import XLSX from 'xlsx';
 
+// The ESM build of xlsx ships without filesystem access wired up —
+// XLSX.readFile throws "Cannot access file" unless we hand it fs.
+XLSX.set_fs(fs);
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+// Same dir as /upload-csv (server/uploads). XLSX used to write to a separate
+// repo-root uploads/ — keep it as a read-only fallback so fileIds from
+// sessions before the unification still re-parse.
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+const legacyUploadsDir = path.join(__dirname, '..', '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const upload = multer({
@@ -70,13 +78,17 @@ router.get('/xlsx-sheet', (req, res) => {
     // by /upload-xlsx. Without basename(), a caller could read arbitrary files
     // via "../../etc/passwd".
     const safeId = path.basename(fileId);
-    const filePath = path.join(uploadsDir, safeId);
-    // Defense-in-depth: ensure the resolved path is still inside uploadsDir.
-    const resolved = path.resolve(filePath);
-    if (!resolved.startsWith(path.resolve(uploadsDir) + path.sep)) {
-      return res.status(400).json({ error: 'invalid fileId' });
+    // Try the current dir first, then the legacy repo-root dir.
+    let resolved = null;
+    for (const dir of [uploadsDir, legacyUploadsDir]) {
+      const candidate = path.resolve(path.join(dir, safeId));
+      // Defense-in-depth: ensure the resolved path is still inside the dir.
+      if (!candidate.startsWith(path.resolve(dir) + path.sep)) {
+        return res.status(400).json({ error: 'invalid fileId' });
+      }
+      if (fs.existsSync(candidate)) { resolved = candidate; break; }
     }
-    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'file not found' });
+    if (!resolved) return res.status(404).json({ error: 'file not found' });
 
     const workbook = XLSX.readFile(resolved);
     const sheets = workbook.SheetNames;

@@ -584,6 +584,20 @@ export default function DataverseInputConfig({ nodeId }) {
           />
         </>
       )}
+
+      {/* Collect metadata participation */}
+      <label
+        className="flex items-center gap-2 text-xs text-slate-200 border-t border-slate-700 pt-3"
+        title="When the toolbar's Collect metadata runs, this node fetches a small sample (≈25 rows) so downstream configs can see its fields — without a full fetch or run. Untick to leave this node out."
+      >
+        <input
+          type="checkbox"
+          checked={cfg.collectFetch !== false}
+          onChange={(e) => updateNodeConfig(nodeId, { collectFetch: e.target.checked })}
+          className="accent-sky-500"
+        />
+        Fetch sample during Collect metadata
+      </label>
     </div>
   );
 }

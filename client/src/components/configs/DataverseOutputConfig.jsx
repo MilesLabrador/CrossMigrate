@@ -2,12 +2,13 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Papa from 'papaparse';
 import {
   Search, ChevronDown, ChevronRight, Check, Loader2, LogIn,
-  Download, Upload, AlertCircle, CheckCircle2,
+  Download, Upload, AlertCircle, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
 import ColumnDropdown from '../ColumnDropdown';
 import { distance } from 'fastest-levenshtein';
 import { fetchEntities, fetchEntityFields, importToDataverseSSE } from '../../lib/api';
-import { usePipelineStore, getUpstreamColumns } from '../../store/usePipelineStore';
+import { usePipelineStore, getUpstreamColumns, getUpstreamSchema, getUpstreamSample } from '../../store/usePipelineStore';
+import { inferType } from '../../lib/inferType';
 import { getCachedEntities, setCachedEntities } from '../../lib/entityCache';
 import SignInModal from '../SignInModal';
 import clsx from 'clsx';
@@ -32,6 +33,26 @@ function entityLogicalFromCollection(collName, entities) {
   return e?.logicalName || collName;
 }
 
+// ── Type validation: incoming pipeline schema vs Dataverse AttributeType ─────
+// Maps each AttributeType to the pipeline types it accepts. `null` means
+// "don't validate" — string-ish targets take anything, and lookup/picklist
+// correctness can't be judged from a scalar type.
+const ATTR_TYPE_COMPAT = {
+  Integer: ['number'], BigInt: ['number'], Decimal: ['number'], Double: ['number'], Money: ['number'],
+  Boolean: ['boolean'],
+  DateTime: ['date'],
+  String: null, Memo: null,
+  Picklist: null, Lookup: null, Customer: null, Owner: null,
+  Uniqueidentifier: null, State: null, Status: null,
+};
+
+function mappingTypeWarning(schemaType, attrType) {
+  if (!schemaType || schemaType === 'empty') return null;
+  const accepted = ATTR_TYPE_COMPAT[attrType];
+  if (!accepted || accepted.includes(schemaType)) return null;
+  return `Type mismatch: incoming column is ${schemaType}, but this Dataverse field is ${attrType}. Convert it upstream (Convert Types node) or the import may fail.`;
+}
+
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Pick the most human-readable identifier from a failed row for display
@@ -53,6 +74,14 @@ export default function DataverseOutputConfig({ nodeId }) {
   const cfg      = node?.data?.config || {};
   const incoming = getUpstreamColumns(nodeId, state);
   const { environments } = state;
+
+  // Incoming column types: the last run's streamed schema when available,
+  // otherwise a rough client-side inference over the upstream sample.
+  const incomingTypeFor = (() => {
+    const fromRun = new Map(getUpstreamSchema(nodeId, state).map((s) => [s.name, s.type]));
+    const sample = getUpstreamSample(nodeId, state, 100);
+    return (col) => fromRun.get(col) || (sample.length ? inferType(sample.map((r) => r[col])) : null);
+  })();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -397,24 +426,50 @@ export default function DataverseOutputConfig({ nodeId }) {
           <Label>Field mappings (source → Dataverse field)</Label>
           {loadingFields && <div className="text-xs text-slate-500">Loading fields…</div>}
           <div className="space-y-1.5 max-h-72 overflow-y-auto" onWheelCapture={(e) => e.stopPropagation()}>
-            {(cfg.fieldMappings || []).map((m, i) => (
-              <div key={i} className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
-                <div className="bg-slate-800 px-2 py-1 rounded text-xs text-slate-200 truncate">{m.source}</div>
-                <span className="text-slate-500">→</span>
-                <ColumnDropdown
-                  value={m.target || ''}
-                  options={fields.map((f) => ({
-                    value: f.logicalName,
-                    label: f.displayName + (f.requiredLevel === 'ApplicationRequired' ? ' *' : ''),
-                    sub: f.logicalName,
-                  }))}
-                  onChange={(target) => setMapping(i, { target })}
-                  placeholder="—"
-                  disabled={loadingFields}
-                />
-              </div>
-            ))}
+            {(cfg.fieldMappings || []).map((m, i) => {
+              const attrType = fields.find((f) => f.logicalName === m.target)?.attributeType;
+              const warning = m.target ? mappingTypeWarning(incomingTypeFor(m.source), attrType) : null;
+              return (
+                <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] gap-2 items-center">
+                  <div className="bg-slate-800 px-2 py-1 rounded text-xs text-slate-200 truncate">{m.source}</div>
+                  <span className="text-slate-500">→</span>
+                  <ColumnDropdown
+                    value={m.target || ''}
+                    options={fields.map((f) => ({
+                      value: f.logicalName,
+                      label: f.displayName + (f.requiredLevel === 'ApplicationRequired' ? ' *' : ''),
+                      sub: f.logicalName,
+                    }))}
+                    onChange={(target) => setMapping(i, { target })}
+                    placeholder="—"
+                    disabled={loadingFields}
+                  />
+                  <span className="w-3.5 shrink-0">
+                    {warning && <AlertTriangle size={13} className="text-amber-400" title={warning} />}
+                  </span>
+                </div>
+              );
+            })}
           </div>
+
+          {/* Required Dataverse fields nobody is mapping to */}
+          {(() => {
+            const targeted = new Set((cfg.fieldMappings || []).map((m) => m.target).filter(Boolean));
+            const unmapped = fields.filter(
+              (f) => f.requiredLevel === 'ApplicationRequired' && !targeted.has(f.logicalName)
+            );
+            if (!unmapped.length) return null;
+            return (
+              <div className="mt-2 bg-amber-950/40 border border-amber-800/60 rounded px-2 py-1.5">
+                <div className="text-[10px] text-amber-300 font-medium flex items-center gap-1 mb-0.5">
+                  <AlertTriangle size={10} /> Required fields with no mapping
+                </div>
+                <div className="text-[10px] text-amber-200/80">
+                  {unmapped.map((f) => f.displayName).join(', ')} — rows may be rejected on import.
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

@@ -1,8 +1,20 @@
 import express from 'express';
-import { topologicalSort, inputsFor } from '../engine/topologicalSort.js';
+import {
+  topologicalSort,
+  inputsFor,
+  inputsByHandleFor,
+  inputSchemaFor,
+  schemasByHandleFor,
+} from '../engine/topologicalSort.js';
 import { executeNode } from '../engine/executeNode.js';
 
 const router = express.Router();
+
+// Node types whose client UI needs the full output rows after a run (preview
+// tables, CSV download, staging Dataverse/SQL writes). Everything else only
+// gets the 3-row sample — streaming full rows for every intermediate node
+// made the response O(rows × nodes).
+const CLIENT_NEEDS_ROWS = new Set(['preview', 'csvExport', 'dataverseOutput', 'sqlOutput']);
 
 // NDJSON stream of per-node progress
 router.post('/run-pipeline', async (req, res) => {
@@ -34,7 +46,10 @@ router.post('/run-pipeline', async (req, res) => {
     write({ type: 'node', nodeId: id, status: 'running' });
     try {
       const input = inputsFor(id, nodes, edges, results);
-      const out = executeNode(node, input);
+      const handleInputs = inputsByHandleFor(id, edges, results);
+      const inputSchema = inputSchemaFor(id, edges, results);
+      const handleSchemas = schemasByHandleFor(id, edges, results);
+      const out = executeNode(node, input, handleInputs, inputSchema, handleSchemas);
       results[id] = out;
       write({
         type: 'node',
@@ -42,8 +57,9 @@ router.post('/run-pipeline', async (req, res) => {
         status: 'success',
         rowCount: out.meta?.rowCount ?? out.rows.length,
         meta: out.meta,
+        schema: out.schema || [],
         sample: out.rows.slice(0, 3),
-        rows: out.rows, // include full output so client can stage Dataverse imports
+        ...(CLIENT_NEEDS_ROWS.has(node.type) ? { rows: out.rows } : {}),
       });
     } catch (err) {
       results[id] = { rows: [], meta: { error: err.message } };

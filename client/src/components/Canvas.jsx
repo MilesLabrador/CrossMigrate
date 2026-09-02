@@ -22,7 +22,11 @@ import SelectColumnsNode  from '../nodes/SelectColumnsNode';
 import SelectMapNode       from '../nodes/SelectMapNode';
 import FilterNode          from '../nodes/FilterNode';
 import TransformNode       from '../nodes/TransformNode';
+import ConvertTypesNode    from '../nodes/ConvertTypesNode';
+import LookupNode          from '../nodes/LookupNode';
+import CacheNode           from '../nodes/CacheNode';
 import DeduplicateNode     from '../nodes/DeduplicateNode';
+import JoinNode            from '../nodes/JoinNode';
 import PreviewNode         from '../nodes/PreviewNode';
 import FieldUsageNode      from '../nodes/FieldUsageNode';
 import CSVExportNode       from '../nodes/CSVExportNode';
@@ -42,7 +46,11 @@ const nodeTypes = {
   selectMap:       SelectMapNode,
   filter:          FilterNode,
   transform:       TransformNode,
+  convertTypes:    ConvertTypesNode,
+  lookup:          LookupNode,
+  cache:           CacheNode,
   deduplicate:     DeduplicateNode,
+  join:            JoinNode,
   preview:         PreviewNode,
   fieldUsage:      FieldUsageNode,
   csvExport:       CSVExportNode,
@@ -245,6 +253,7 @@ function CanvasInner() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={(c) => c.source !== c.target}
         onNodeClick={(_, node) => selectNode(node.id)}
         onNodeContextMenu={onNodeContextMenu}
         onSelectionContextMenu={onSelectionContextMenu}

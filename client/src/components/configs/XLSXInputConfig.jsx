@@ -1,6 +1,7 @@
 import React from 'react';
 import { usePipelineStore } from '../../store/usePipelineStore';
 import { fetchXlsxSheet } from '../../lib/api';
+import SchemaEditor from './SchemaEditor';
 
 export default function XLSXInputConfig({ nodeId }) {
   const { nodes, updateNodeConfig, updateNodeData } = usePipelineStore();
@@ -67,6 +68,7 @@ export default function XLSXInputConfig({ nodeId }) {
           </div>
         </div>
       )}
+      <SchemaEditor nodeId={nodeId} />
     </div>
   );
 }

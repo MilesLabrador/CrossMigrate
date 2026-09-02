@@ -67,6 +67,12 @@ export default function NodeShell({
   children,
   selected,
   widthClass = 'w-64',
+  // Multi-input nodes pass [{ id, top, title, className }] to replace the
+  // single default left target handle (e.g. join's 'left' + 'right').
+  targetHandles,
+  // Multi-output nodes pass the same shape to replace the single default
+  // right source handle (e.g. convertTypes' main output + 'errors').
+  sourceHandles,
 }) {
   const { nodes, updateNodeData, nodeStatus, selectNode } = usePipelineStore();
   const node   = nodes.find((n) => n.id === id);
@@ -167,6 +173,16 @@ export default function NodeShell({
 
   const renderStatusDot = () => {
     if (!status) return <Circle size={10} className="text-slate-500 fill-slate-600" />;
+    // Metadata collected but no real run yet — fields are known, rows aren't.
+    if (!status.status && status.metaCollected)
+      return (
+        <span
+          className="text-sky-400 text-[10px] font-medium"
+          title="Metadata collected — columns & types known from a sample dry run"
+        >
+          meta
+        </span>
+      );
     if (status.status === 'running')
       return <Loader2 size={12} className="animate-spin text-sky-400" />;
     if (status.status === 'success')
@@ -211,7 +227,19 @@ export default function NodeShell({
       }}
     >
       {/* Connection handles — outside the overflow-hidden card so they're never clipped */}
-      {category !== 'destination' && (
+      {targetHandles?.length ? (
+        targetHandles.map((h) => (
+          <Handle
+            key={h.id}
+            id={h.id}
+            type="target"
+            position={Position.Left}
+            className={h.className || 'handle-transform'}
+            style={{ top: h.top }}
+            title={h.title}
+          />
+        ))
+      ) : category !== 'destination' && (
         <Handle
           type="target"
           position={Position.Left}
@@ -220,11 +248,27 @@ export default function NodeShell({
           style={{ opacity: category === 'source' ? 0 : 1 }}
         />
       )}
-      {category !== 'source' && category !== 'destination' && (
-        <Handle type="source" position={Position.Right} className="handle-transform" />
-      )}
-      {category === 'source' && (
-        <Handle type="source" position={Position.Right} className="handle-source" />
+      {sourceHandles?.length ? (
+        sourceHandles.map((h) => (
+          <Handle
+            key={h.id}
+            id={h.id}
+            type="source"
+            position={Position.Right}
+            className={h.className || 'handle-transform'}
+            style={{ top: h.top }}
+            title={h.title}
+          />
+        ))
+      ) : (
+        <>
+          {category !== 'source' && category !== 'destination' && (
+            <Handle type="source" position={Position.Right} className="handle-transform" />
+          )}
+          {category === 'source' && (
+            <Handle type="source" position={Position.Right} className="handle-source" />
+          )}
+        </>
       )}
       {category === 'destination' && (
         <Handle type="target" position={Position.Left} className="handle-destination" />
